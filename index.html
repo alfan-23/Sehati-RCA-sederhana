@@ -201,7 +201,7 @@
                             </div>
 
                             <div class="flex flex-wrap gap-3 pt-2">
-                                <button type="button" onclick="generateNarasi()" class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 text-xs">
+                                <button type="button" id="btnNarasi" onclick="generateNarasi(this)" class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 text-xs">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> ✨ AI BUAT NARASI BAKU
                                 </button>
                             </div>
@@ -443,7 +443,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">1. TIPE INSIDEN DAN SUB TIPE</label>
-                                <button type="button" onclick="generateAIInvestigasi('tipe')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('tipe', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Tipe & Sub Tipe
                                 </button>
                             </div>
@@ -478,7 +478,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">2. TIPE HARM DAN CAUSA (KODE ICD-10)</label>
-                                <button type="button" onclick="generateAIInvestigasi('harm_causa')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('harm_causa', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Harm & Causa
                                 </button>
                             </div>
@@ -500,7 +500,7 @@
                                 <div class="relative">
                                     <div class="flex justify-between items-end mb-1">
                                         <label class="text-[11px] font-semibold text-gray-600 block">A. Asuhan pelayanan/Care Management Problem (CMP)</label>
-                                        <button type="button" onclick="generateAIInvestigasi('masalah_cmp')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                        <button type="button" onclick="generateAIInvestigasi('masalah_cmp', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                             ✨ AI CMP
                                         </button>
                                     </div>
@@ -509,7 +509,7 @@
                                 <div class="relative">
                                     <div class="flex justify-between items-end mb-1">
                                         <label class="text-[11px] font-semibold text-gray-600 block">B. Masalah Pelayanan / Service Delivery Problem (SDP)</label>
-                                        <button type="button" onclick="generateAIInvestigasi('masalah_sdp')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                        <button type="button" onclick="generateAIInvestigasi('masalah_sdp', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                             ✨ AI SDP
                                         </button>
                                     </div>
@@ -521,7 +521,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">4. Penyebab Insiden</label>
-                                <button type="button" onclick="generateAIInvestigasi('penyebab')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('penyebab', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Penyebab
                                 </button>
                             </div>
@@ -533,7 +533,7 @@
                                 <div>
                                     <label class="text-[11px] font-semibold text-gray-600 block mb-1 flex justify-between">
                                         B. Akar Masalah
-                                        <button type="button" onclick="generateAIInvestigasi('akar')" class="text-[9px] text-indigo-600 hover:underline">✨ AI 5-Why</button>
+                                        <button type="button" onclick="generateAIInvestigasi('akar', this)" class="text-[9px] text-indigo-600 hover:underline">✨ AI 5-Why</button>
                                     </label>
                                     <textarea id="inv_akar_masalah" rows="3" class="inv-input auto-save w-full"></textarea>
                                 </div>
@@ -543,7 +543,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">5. Orang yang terlibat sebagai penyebab langsung insiden</label>
-                                <button type="button" onclick="generateAIInvestigasi('orang_terlibat')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('orang_terlibat', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Orang Terlibat
                                 </button>
                             </div>
@@ -560,7 +560,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">6. Proses / fase pelayanan saat terjadi insiden</label>
-                                <button type="button" onclick="generateAIInvestigasi('proses_fase')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('proses_fase', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Proses/Fase
                                 </button>
                             </div>
@@ -576,7 +576,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">7. Faktor-faktor Kontributor</label>
-                                <button type="button" onclick="generateAIInvestigasi('faktor')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('faktor', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Faktor & Komponen
                                 </button>
                             </div>
@@ -594,7 +594,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">8. Faktor Mitigasi</label>
-                                <button type="button" onclick="generateAIInvestigasi('mitigasi')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('mitigasi', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Faktor Mitigasi
                                 </button>
                             </div>
@@ -627,7 +627,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">9. Cara mendeteksi insiden</label>
-                                <button type="button" onclick="generateAIInvestigasi('deteksi')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('deteksi', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Deteksi
                                 </button>
                             </div>
@@ -643,7 +643,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">10. Dampak pada Fasyankes</label>
-                                <button type="button" onclick="generateAIInvestigasi('dampak_fasyankes')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('dampak_fasyankes', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Dampak
                                 </button>
                             </div>
@@ -659,7 +659,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">11. Rekomendasi</label>
-                                <button type="button" onclick="generateAIInvestigasi('rekomendasi')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('rekomendasi', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Rekomendasi
                                 </button>
                             </div>
@@ -669,7 +669,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">12. Tindakan yang akan dilakukan</label>
-                                <button type="button" onclick="generateAIInvestigasi('tindakan_akan')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('tindakan_akan', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Tindakan
                                 </button>
                             </div>
@@ -679,7 +679,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">13. Tindakan perbaikan</label>
-                                <button type="button" onclick="generateAIInvestigasi('tindakan_perbaikan')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('tindakan_perbaikan', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Perbaikan
                                 </button>
                             </div>
@@ -704,7 +704,7 @@
                         <div>
                             <div class="flex justify-between items-end mb-2">
                                 <label class="inv-label mb-0">14. Tindakan untuk mengurangi risiko</label>
-                                <button type="button" onclick="generateAIInvestigasi('tindakan_kurangi_risiko')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                <button type="button" onclick="generateAIInvestigasi('tindakan_kurangi_risiko', this)" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
                                     ✨ AI Mitigasi Risiko
                                 </button>
                             </div>
@@ -934,15 +934,11 @@
                 isWaitingForRetry = null;
                 showMessage("❌ Siklus Terhenti: Seluruh API Key dan Model gagal memproses.", "error");
                 
-                // Kembalikan tombol-tombol AI yang sedang disabled/loading
+                // Kembalikan tombol-tombol AI yang sedang disabled/loading menggunakan dataset
                 document.querySelectorAll('button:disabled').forEach(b => {
                     b.disabled = false;
-                    if(b.innerHTML.includes('MEMPROSES AI...')) { 
-                        b.innerHTML = `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> ✨ AI BUAT NARASI BAKU`;
-                    } else if(b.innerHTML.includes('SARAN AI UNTUK GRADING')) { 
-                        b.innerHTML = `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> ✨ SARAN AI UNTUK GRADING`;
-                    } else if (b.innerHTML.includes('Proses...')) {
-                        b.innerHTML = `✨ AI`; 
+                    if (b.dataset.originalHtml) {
+                        b.innerHTML = b.dataset.originalHtml;
                     }
                 });
                 
@@ -1184,15 +1180,7 @@
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
             const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                // MATIKAN Filter Keamanan agar tidak sensitif dengan teks cedera medis (KTD/Sentinel)
-                safetySettings: [
-                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                ],
-                systemInstruction: { parts: [{ text: "Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta." }] }
+                contents: [{ parts: [{ text: "Instruksi Sistem: Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta.\n\n" + prompt }] }]
             };
 
             let retries = 0;
@@ -1213,6 +1201,10 @@
                              }
                              throw new Error("API_FAIL_ROTATE");
                         }
+                        if (response.status === 400) {
+                             const errData = await response.json().catch(()=>({}));
+                             throw new Error(`BAD_REQUEST: ${errData.error?.message || "Format Payload Ditolak"}`);
+                        }
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     
@@ -1222,7 +1214,6 @@
                         window.parent.postMessage({ type: 'API_SUCCESS' }, '*');
                     }
                     
-                    // Gunakan Optional Chaining (?.) untuk mencegah crash jika AI masih memblokir respon
                     if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
                         return data.candidates[0].content.parts[0].text;
                     } else if (data.candidates?.[0]?.finishReason === 'SAFETY') {
@@ -1231,7 +1222,7 @@
                         throw new Error("Format respons API tidak sesuai");
                     }
                 } catch (error) {
-                    if (error.message === "API_FAIL_ROTATE" || error.message === "SAFETY_BLOCK") throw error;
+                    if (error.message === "API_FAIL_ROTATE" || error.message === "SAFETY_BLOCK" || error.message.includes("BAD_REQUEST")) throw error;
                     retries++;
                     if (retries >= maxRetries) throw error;
                     await new Promise(resolve => setTimeout(resolve, delays[retries-1]));
@@ -1240,7 +1231,7 @@
         }
 
         // AI Fungsi 1: Narasi
-        async function generateNarasi() {
+        async function generateNarasi(btnElement) {
             const rawText = document.getElementById('kronologis_insiden').value.trim();
             if (!rawText) {
                 showMessage('Isi kronologis insiden terlebih dahulu!', 'error');
@@ -1249,8 +1240,13 @@
 
             const container = document.getElementById('narasi_result_container');
             const textarea = document.getElementById('final_narasi');
-            const btn = event.currentTarget;
-            const originalHTML = btn.innerHTML;
+            const btn = btnElement || document.getElementById('btnNarasi');
+            
+            let originalHTML = btn.dataset.originalHtml;
+            if (!originalHTML) {
+                originalHTML = btn.innerHTML;
+                btn.dataset.originalHtml = originalHTML;
+            }
             
             btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> MEMPROSES AI...`;
             btn.disabled = true;
@@ -1271,8 +1267,8 @@
             } catch (error) {
                 if (error.message === "API_FAIL_ROTATE") {
                     textarea.value = "Menunggu rotasi API/Model otomatis dari Dashboard...";
-                    isWaitingForRetry = () => generateNarasi();
-                    lastFailedAction = () => generateNarasi();
+                    isWaitingForRetry = () => generateNarasi(btn);
+                    lastFailedAction = () => generateNarasi(btn);
                 } else if (error.message === "SAFETY_BLOCK") {
                     textarea.value = "Narasi diblokir Google AI karena terdeteksi sebagai konten berbahaya. Mohon edit kronologis agar tidak terlalu eksplisit.";
                     showMessage("Ditolak oleh Filter Keamanan AI.", "error");
@@ -1301,7 +1297,12 @@
             }
 
             const btn = document.getElementById('btnAIGrading');
-            const originalHtml = btn.innerHTML;
+            let originalHtml = btn.dataset.originalHtml;
+            if (!originalHtml) {
+                originalHtml = btn.innerHTML;
+                btn.dataset.originalHtml = originalHtml;
+            }
+
             btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> MEMPROSES AI...`;
             btn.disabled = true;
 
@@ -1339,7 +1340,7 @@
         }
 
         // AI Fungsi 3: INVESTIGASI SEDERHANA HASIL ANALISA 14 POIN
-        async function generateAIInvestigasi(type) {
+        async function generateAIInvestigasi(type, btnElement) {
             const narasi = document.getElementById('final_narasi').value.trim() || document.getElementById('kronologis_insiden').value.trim();
             const namaInsiden = document.getElementById('insiden').value;
 
@@ -1350,8 +1351,12 @@
 
             let prompt = "";
             let targetIds = [];
-            let btn = event.currentTarget;
-            let originalHtml = btn.innerHTML;
+            let btn = btnElement;
+            let originalHtml = btn.dataset.originalHtml;
+            if (!originalHtml) {
+                originalHtml = btn.innerHTML;
+                btn.dataset.originalHtml = originalHtml;
+            }
 
             btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-3 w-3 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Proses...`;
             btn.disabled = true;
@@ -1496,8 +1501,8 @@
             } catch (error) {
                 if (error.message === "API_FAIL_ROTATE") {
                     showMessage("Menunggu rotasi API/Model otomatis...", "info");
-                    isWaitingForRetry = () => generateAIInvestigasi(type);
-                    lastFailedAction = () => generateAIInvestigasi(type);
+                    isWaitingForRetry = () => generateAIInvestigasi(type, btn);
+                    lastFailedAction = () => generateAIInvestigasi(type, btn);
                 } else if (error.message === "SAFETY_BLOCK") {
                     showMessage("Analisis diblokir Filter Keamanan Google AI (konten terlalu eksplisit).", "error");
                     btn.innerHTML = originalHtml;
