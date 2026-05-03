@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pelaporan & Investigasi IKP Puskesmas</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tambahan library untuk mengunduh PDF secara langsung (Bypass blokir iframe) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        textarea::-webkit-scrollbar { width: 6px; }
+        textarea::-webkit-scrollbar-track { background: #f1f1f1; }
+        textarea::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .print-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10pt; color: #000; font-family: Arial, sans-serif; }
+        .print-table th, .print-table td { border: 1px solid #000; padding: 6px 8px; vertical-align: top; }
+        .print-table th { background-color: #f3f4f6; text-align: left; font-size: 11pt; }
+        .print-sub-table { width: 100%; border-collapse: collapse; }
+        .print-sub-table td { border: none; border-bottom: 1px solid #eee; padding: 4px 0; }
+        .print-sub-table tr:last-child td { border-bottom: none; }
+        
+        /* CSS KHUSUS PRINT-TO-PDF NATIVE (TEXT BASED) */
+        @media print {
+            body { background-color: white; margin: 0; padding: 0; }
+            #appContainer, .no-print, #customModal, #custom-toast { display: none !important; }
+            #printViewContainer { display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
+            .print-content { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; }
+            
+            .print-table { width: 100% !important; page-break-inside: auto; margin-bottom: 20px; }
+            .print-table tr { page-break-inside: avoid; page-break-after: auto; }
+            .print-table th, .print-table td { border: 1px solid #000 !important; word-break: break-word; }
+            
+            @page { margin: 1.5cm; size: A4 portrait; }
+        }
+        
+        @keyframes pulse-save { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+        .saving-active { animation: pulse-save 1.5s infinite; color: #10b981; }
+        
+        @keyframes ai-scan { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .bg-ai-gradient { background: linear-gradient(270deg, #e0e7ff, #ede9fe, #fae8ff); background-size: 400% 400%; animation: ai-scan 3s ease infinite; }
+
+        @keyframes fade-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+
+        .tab-active { background-color: #0f766e; color: white; border-bottom: 4px solid #134e4a; }
+        .tab-inactive { background-color: #f1f5f9; color: #475569; border-bottom: 4px solid #cbd5e1; cursor: pointer; transition: all 0.2s; }
+        .tab-inactive:hover { background-color: #e2e8f0; color: #1e293b; }
+        
+        .grade-biru { background-color: #3b82f6; color: white; }
+        .grade-hijau { background-color: #22c55e; color: white; }
+        .grade-kuning { background-color: #eab308; color: white; }
+        .grade-merah { background-color: #ef4444; color: white; }
+
+        .inv-input { w-full; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem; outline: none; font-size: 0.875rem; background-color: white; }
+        .inv-input:focus { border-color: #0d9488; box-shadow: 0 0 0 1px #0d9488; }
+        .inv-label { font-size: 0.75rem; font-weight: 700; color: #374151; margin-bottom: 0.25rem; display: block; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased p-0 md:p-8">
+
+    <div id="appContainer" class="max-w-5xl mx-auto bg-white rounded-none md:rounded-2xl shadow-xl overflow-hidden border border-gray-200 relative">
+        
+        <div class="bg-teal-800 text-white pt-6 px-6 pb-0 flex flex-col gap-4">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-2xl font-bold flex items-center gap-2">
+                        Sistem Pelaporan & Investigasi IKP
+                        <span class="px-2 py-1 bg-teal-600 border border-teal-500 rounded text-[10px] uppercase tracking-widest font-bold shadow-sm">AI Terintegrasi</span>
+                    </h1>
+                    <p class="text-teal-200 mt-1 text-sm">Sesuai Juknis Aplikasi Laporan IKP (Kemenkes RI)</p>
+                </div>
+                <div id="autoSaveIndicator" class="text-teal-200 text-[10px] font-bold flex items-center transition-all duration-300">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <span id="autoSaveText">Sistem Siap</span>
+                </div>
+            </div>
+
+            <div class="flex flex-row mt-4 rounded-t-lg overflow-hidden">
+                <button type="button" onclick="switchTab('laporan')" id="btnTabLaporan" class="flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-active uppercase transition-all">
+                    1. Form Pelaporan IKP
+                </button>
+                <button type="button" onclick="switchTab('investigasi')" id="btnTabInvestigasi" class="flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-inactive uppercase transition-all">
+                    2. Hasil Investigasi & Analisa
+                </button>
+            </div>
+        </div>
+
+        <div id="tabLaporanContainer" class="block">
+            <div class="bg-gray-50 p-4 border-b border-gray-200 flex justify-end gap-2">
+                <button type="button" onclick="resetFormWithConfirm()" class="bg-white hover:bg-red-50 text-red-600 font-bold py-2 px-4 rounded-lg shadow-sm transition-all text-xs border border-red-200">
+                    Kosongkan Form
+                </button>
+                <input type="file" id="draftLoaderLaporan" accept=".txt,.json" style="display:none;" onchange="loadDraft(event)">
+                <button type="button" onclick="document.getElementById('draftLoaderLaporan').click()" class="bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-4 rounded-lg shadow transition-all text-xs flex items-center border border-teal-400">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Muat File TXT Draft
+                </button>
+            </div>
+
+            <form id="ikpFormLaporan" class="p-5 md:p-8 space-y-10" onsubmit="event.preventDefault();">
+                <section>
+                    <div class="flex items-center mb-6 border-b border-gray-100 pb-3">
+                        <span class="bg-teal-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold mr-3 shadow-sm">A</span>
+                        <h2 class="text-lg font-bold text-gray-800 uppercase tracking-tight">Data Pasien</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">1. Kelompok Umur</label>
+                            <select id="kelompok_umur" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih Kelompok Umur --</option>
+                                <option value="< 1 bulan">< 1 bulan</option>
+                                <option value=">= 1 bulan - 1 tahun">>= 1 bulan - 1 tahun</option>
+                                <option value="> 1 tahun - 5 tahun">> 1 tahun - 5 tahun</option>
+                                <option value="> 5 tahun - 15 tahun">> 5 tahun - 15 tahun</option>
+                                <option value="> 15 tahun - 30 tahun">> 15 tahun - 30 tahun</option>
+                                <option value="> 30 tahun - 65 tahun">> 30 tahun - 65 tahun</option>
+                                <option value="> 65 tahun">> 65 tahun</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">2. Umur</label>
+                            <div class="flex gap-2">
+                                <div class="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-2 flex items-center">
+                                    <input type="number" id="umur_tahun" min="0" placeholder="0" class="w-full p-2 outline-none bg-transparent text-sm font-medium auto-save">
+                                    <span class="text-gray-400 text-[10px] font-bold uppercase">Thn</span>
+                                </div>
+                                <div class="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-2 flex items-center">
+                                    <input type="number" id="umur_bulan" min="0" max="11" placeholder="0" class="w-full p-2 outline-none bg-transparent text-sm font-medium auto-save">
+                                    <span class="text-gray-400 text-[10px] font-bold uppercase">Bln</span>
+                                </div>
+                                <div class="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-2 flex items-center">
+                                    <input type="number" id="umur_hari" min="0" max="31" placeholder="0" class="w-full p-2 outline-none bg-transparent text-sm font-medium auto-save">
+                                    <span class="text-gray-400 text-[10px] font-bold uppercase">Hari</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">3. Penanggung Biaya Pasien</label>
+                            <select id="penanggung_biaya" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih Penanggung Biaya --</option>
+                                <option value="BPJS">BPJS</option>
+                                <option value="Jamkesda">Jamkesda</option>
+                                <option value="Umum/Pribadi">Umum/Pribadi</option>
+                                <option value="Asuransi Swasta">Asuransi Swasta</option>
+                                <option value="Pemerintah">Pemerintah</option>
+                                <option value="Perusahaan">Perusahaan</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">4. Jenis Kelamin</label>
+                            <select id="jenis_kelamin" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih Jenis Kelamin --</option>
+                                <option value="Laki-Laki">Laki-laki</option>
+                                <option value="Perempuan">Perempuan</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2 space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">5. Tanggal Mendapatkan Pelayanan</label>
+                            <input type="datetime-local" id="tgl_pelayanan" class="w-full md:w-1/2 border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <div class="flex items-center mb-6 border-b border-gray-100 pb-3">
+                        <span class="bg-teal-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold mr-3 shadow-sm">B</span>
+                        <h2 class="text-lg font-bold text-gray-800 uppercase tracking-tight">Rincian Kejadian</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="md:col-span-2 space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">1. Tanggal dan Waktu Insiden</label>
+                            <input type="datetime-local" id="waktu_insiden" class="w-full md:w-1/2 border-2 border-yellow-200 rounded-lg p-2.5 outline-none text-sm bg-yellow-50 font-bold auto-save">
+                        </div>
+
+                        <div class="md:col-span-2 space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">2. Insiden</label>
+                            <input type="text" id="insiden" placeholder="Sebutkan secara ringkas insiden yang terjadi..." class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                        </div>
+
+                        <!-- 3. KRONOLOGIS -->
+                        <div class="md:col-span-2 space-y-3">
+                            <div class="flex justify-between items-end mb-1">
+                                <label class="text-xs font-bold text-gray-500 uppercase block">3. Kronologis Insiden (Catatan Mentah)</label>
+                            </div>
+                            <textarea id="kronologis_insiden" rows="6" class="inv-input auto-save w-full border-gray-400" placeholder="Tuliskan urutan waktu kejadian secara rinci di sini..."></textarea>
+                            
+                            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 text-xs text-blue-800 mt-2 rounded-r-lg shadow-sm">
+                                <p class="font-bold mb-1">Panduan Penulisan Kronologi (To the point & mudah dipahami):</p>
+                                <ul class="list-disc pl-4 space-y-1">
+                                    <li><b>Urutan Waktu Presisi:</b> Tulis berdasarkan urutan kejadian nyata beserta tanggal & jam yang jelas.</li>
+                                    <li><b>Poin Isi Narasi (5W1H):</b> Siapa yang terlibat (Who), Apa tindakan yang dilakukan/tidak dilakukan (What), Di mana lokasi spesifiknya (Where).</li>
+                                    <li><b>Fokus Pada Proses:</b> Jabarkan per tahapan: <i>Pra-Insiden</i>, <i>Insiden</i>, <i>Deteksi</i>, <i>Mitigasi</i>.</li>
+                                    <li><b>Data Objektif:</b> Gunakan data rekam medis. Hindari asumsi atau perasaan.</li>
+                                </ul>
+                            </div>
+
+                            <div class="flex flex-wrap gap-3 pt-2">
+                                <button type="button" onclick="generateNarasi()" class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 text-xs">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> ✨ AI BUAT NARASI BAKU
+                                </button>
+                            </div>
+
+                            <div id="narasi_result_container" class="hidden pt-4">
+                                <div class="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 space-y-3">
+                                    <div class="flex justify-between items-center">
+                                        <label class="text-xs font-black text-indigo-700 uppercase tracking-widest">Hasil Narasi Kronologis Akhir (Baku):</label>
+                                    </div>
+                                    <textarea id="final_narasi" rows="5" class="w-full bg-white border border-indigo-100 rounded-xl p-4 text-sm text-gray-700 leading-relaxed outline-none cursor-text auto-save" placeholder="Hasil narasi medis akan muncul di sini..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2 space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">4. Insiden Terjadi Pada Pasien Yang Akan Melakukan Pelayanan</label>
+                            <select id="pelayanan_awal" onchange="toggleLainnya(this, 'pelayanan_awal_lain_div', 'pelayanan_awal_lain')" class="w-full md:w-1/2 border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih Pelayanan --</option>
+                                <option value="Keluarga Berencana">Keluarga Berencana</option>
+                                <option value="ANC (Ibu Hamil)">ANC (Ibu Hamil)</option>
+                                <option value="Persalinan dan Paska Persalinan (Ibu Nifas)">Persalinan dan Paska Persalinan (Ibu Nifas)</option>
+                                <option value="Imunisasi">Imunisasi</option>
+                                <option value="Bayi dan Balita">Bayi dan Balita</option>
+                                <option value="Pemeriksaan Umum">Pemeriksaan Umum</option>
+                                <option value="Pemeriksaan Khusus (TB, VCT)">Pemeriksaan Khusus (TB, VCT)</option>
+                                <option value="Gigi dan Mulut">Gigi dan Mulut</option>
+                                <option value="Laboratorium">Laboratorium</option>
+                                <option value="Gawat Darurat dan Tindakan">Gawat Darurat dan Tindakan</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                            <div id="pelayanan_awal_lain_div" class="mt-2 hidden">
+                                <input type="text" id="pelayanan_awal_lain" placeholder="Sebutkan pelayanan lainnya..." class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                            </div>
+                        </div>
+
+                        <!-- TOMBOL AI SARAN GRADING -->
+                        <div class="md:col-span-2 flex flex-col md:flex-row justify-between items-start md:items-center border-t border-gray-100 pt-6 mt-4 gap-4">
+                            <div>
+                                <h3 class="text-sm font-bold text-gray-800 uppercase">Penilaian & Grading Risiko</h3>
+                                <p class="text-[10px] text-gray-500">Isi manual atau gunakan asisten AI untuk memberikan saran referensi grading.</p>
+                            </div>
+                            <button type="button" onclick="generateAIGrading()" id="btnAIGrading" class="w-full md:w-auto flex items-center justify-center bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 text-xs border border-indigo-200">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                ✨ SARAN AI UNTUK GRADING
+                            </button>
+                        </div>
+
+                        <!-- KOLOM HASIL SARAN AI -->
+                        <div id="ai_suggestion_box" class="md:col-span-2 hidden bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 relative animate-fade-in shadow-inner">
+                            <button type="button" onclick="document.getElementById('ai_suggestion_box').classList.add('hidden')" class="absolute top-4 right-4 text-indigo-400 hover:text-indigo-700 bg-white rounded-full p-1 shadow-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                            <div class="flex items-center mb-3">
+                                <span class="text-xs font-black text-indigo-700 uppercase tracking-widest">💡 Referensi Grading AI:</span>
+                            </div>
+                            <div id="ai_suggestion_content" class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap"></div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">5. Jenis Insiden</label>
+                            <select id="jenis_insiden" onchange="updateDampakInsiden()" class="w-full border-2 border-yellow-200 rounded-lg p-2.5 outline-none text-sm bg-yellow-50 font-bold auto-save">
+                                <option value="">-- Pilih Jenis Insiden --</option>
+                                <option value="Kejadian Tidak Diharapkan / KTD (Adverse Event)">Kejadian Tidak Diharapkan / KTD (Adverse Event)</option>
+                                <option value="Kejadian Sentinel (Sentinel Event)">Kejadian Sentinel (Sentinel Event)</option>
+                                <option value="Kejadian Tidak Cedera (KTC)">Kejadian Tidak Cedera (KTC)</option>
+                                <option value="Kejadian Nyaris Cedera (KNC)">Kejadian Nyaris Cedera (KNC)</option>
+                                <option value="Kondisi Potensial Cedera (KPC)">Kondisi Potensial Cedera (KPC)</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">6. Dampak Insiden</label>
+                            <select id="dampak_insiden" onchange="calculateGrading()" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white transition-colors auto-save">
+                                <option value="0">-- Pilih Dampak --</option>
+                                <option value="1">Tidak Cedera</option>
+                                <option value="2">Cedera Ringan</option>
+                                <option value="3">Cedera Reversible / Sedang</option>
+                                <option value="4">Cedera Irreversible / Cedera Berat</option>
+                                <option value="5">Kematian</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">7. Probabilitas</label>
+                            <select id="probabilitas" onchange="calculateGrading()" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="0">-- Pilih Probabilitas --</option>
+                                <option value="1">Sangat Jarang (> 5 tahun/kali)</option>
+                                <option value="2">Jarang (>= 2-5 tahun/kali)</option>
+                                <option value="3">Mungkin (1-2 tahun/kali)</option>
+                                <option value="4">Sering (beberapa kali/tahun)</option>
+                                <option value="5">Sangat Sering (tiap minggu/bulan)</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">Matriks Grading Risiko (Otomatis)</label>
+                            <div id="grading_result" class="w-full border border-gray-300 rounded-lg p-3 text-center text-sm font-bold bg-gray-100 text-gray-500 transition-colors h-[46px] flex items-center justify-center">
+                                Pilih Dampak dan Probabilitas
+                            </div>
+                            <input type="hidden" id="grading_value" class="auto-save">
+                        </div>
+
+                        <div class="md:col-span-2 pt-4 border-t border-gray-100"></div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">8. Orang Pertama Yang Melaporkan Insiden</label>
+                            <select id="pelapor_pertama" onchange="handlePelaporChange()" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih --</option>
+                                <option value="Tenaga Kesehatan">Tenaga Kesehatan</option>
+                                <option value="Pasien/Pengguna Layanan">Pasien/Pengguna Layanan</option>
+                                <option value="Pasien Lainnya">Pasien Lainnya</option>
+                                <option value="Pengunjung">Pengunjung</option>
+                                <option value="Penunggu Pasien/Keluarga">Penunggu Pasien/Keluarga</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                            
+                            <div id="pelapor_nakes_div" class="mt-2 hidden">
+                                <select id="pelapor_nakes" onchange="handlePelaporNakesChange()" class="w-full border border-teal-300 bg-teal-50 rounded-lg p-2.5 outline-none text-sm auto-save">
+                                    <option value="">-- Pilih Jenis Tenaga Kesehatan --</option>
+                                    <option value="Dokter">Dokter</option>
+                                    <option value="Perawat">Perawat</option>
+                                    <option value="Bidan">Bidan</option>
+                                    <option value="Petugas Lainnya">Petugas Lainnya</option>
+                                </select>
+                            </div>
+
+                            <div id="pelapor_lain_div" class="mt-2 hidden">
+                                <input type="text" id="pelapor_lain" placeholder="Sebutkan pihak lainnya..." class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">9. Insiden Terjadi Pada</label>
+                            <select id="lokasi_kejadian" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih Lokasi --</option>
+                                <option value="Pasien di Dalam Gedung/Fasyankes">Pasien di Dalam Gedung/Fasyankes</option>
+                                <option value="Pasien di Luar Gedung/Fasyankes">Pasien di Luar Gedung/Fasyankes</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">10. Tempat Insiden</label>
+                            <select id="tempat_insiden" onchange="toggleLainnya(this, 'tempat_insiden_lain_div', 'tempat_insiden_lain')" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih Tempat Insiden --</option>
+                                <option value="Ruang Pemeriksaan Umum">Ruang Pemeriksaan Umum</option>
+                                <option value="Ruang Pemeriksaan Khusus">Ruang Pemeriksaan Khusus</option>
+                                <option value="Ruang Kesehatan Gigi dan Mulut">Ruang Kesehatan Gigi dan Mulut</option>
+                                <option value="Ruang KIA, KB dan Imunisasi">Ruang KIA, KB dan Imunisasi</option>
+                                <option value="Ruang Komunikasi, Informasi dan Edukasi (KIE)">Ruang Komunikasi, Informasi dan Edukasi (KIE)</option>
+                                <option value="Ruang Farmasi">Ruang Farmasi</option>
+                                <option value="Ruang Persalinan">Ruang Persalinan</option>
+                                <option value="Ruang Rawat Pasca Persalinan">Ruang Rawat Pasca Persalinan</option>
+                                <option value="Ruang Laboratorium">Ruang Laboratorium</option>
+                                <option value="Ruang ASI">Ruang ASI</option>
+                                <option value="Ruang Gawat Darurat atau Ruang Tindakan">Ruang Gawat Darurat atau Ruang Tindakan</option>
+                                <option value="Luar Gedung/Fasyankes">Luar Gedung/Fasyankes</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                            <div id="tempat_insiden_lain_div" class="mt-2 hidden">
+                                <input type="text" id="tempat_insiden_lain" placeholder="Sebutkan lokasi lainnya..." class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">11. Jenis Pelayanan Terkait Insiden</label>
+                            <select id="pelayanan_terkait" onchange="toggleLainnya(this, 'pelayanan_terkait_lain_div', 'pelayanan_terkait_lain')" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih Jenis Pelayanan --</option>
+                                <option value="Keluarga Berencana">Keluarga Berencana</option>
+                                <option value="ANC (Ibu Hamil)">ANC (Ibu Hamil)</option>
+                                <option value="Persalinan dan Paska Persalinan (Ibu Nifas)">Persalinan dan Paska Persalinan (Ibu Nifas)</option>
+                                <option value="Imunisasi">Imunisasi</option>
+                                <option value="Bayi dan Balita">Bayi dan Balita</option>
+                                <option value="Pemeriksaan Umum">Pemeriksaan Umum</option>
+                                <option value="Pemeriksaan Khusus (TB, VCT)">Pemeriksaan Khusus (TB, VCT)</option>
+                                <option value="Gigi dan Mulut">Gigi dan Mulut</option>
+                                <option value="Laboratorium">Laboratorium</option>
+                                <option value="Gawat Darurat dan Tindakan">Gawat Darurat dan Tindakan</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                            <div id="pelayanan_terkait_lain_div" class="mt-2 hidden">
+                                <input type="text" id="pelayanan_terkait_lain" placeholder="Sebutkan pelayanan lainnya..." class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2 space-y-1 mt-4">
+                            <label class="text-xs font-bold text-gray-500 uppercase">12. Tindakan Yang Dilakukan Segera Setelah Kejadian Dan Hasilnya</label>
+                            <textarea id="tindakan_segera" rows="3" class="w-full border border-gray-300 rounded-lg p-3 outline-none text-sm bg-white auto-save" placeholder="Deskripsikan tindakan yang dilakukan..."></textarea>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">13. Tindak Lanjut Oleh</label>
+                            <select id="tindak_lanjut_oleh" onchange="handleTindakLanjutChange()" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih --</option>
+                                <option value="Tim">Tim</option>
+                                <option value="Dokter">Dokter</option>
+                                <option value="Perawat">Perawat</option>
+                                <option value="Bidan">Bidan</option>
+                                <option value="Petugas Lainnya">Petugas Lainnya</option>
+                            </select>
+                            <div id="tindak_lanjut_detail_div" class="mt-2 hidden">
+                                <input type="text" id="tindak_lanjut_detail" placeholder="Sebutkan (profesi petugas / profesi lainnya)..." class="w-full border border-teal-300 bg-teal-50 rounded-lg p-2.5 outline-none text-sm auto-save">
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-500 uppercase">14. Apakah Kejadian Insiden Yang Sama Pernah Terjadi?</label>
+                            <select id="pernah_terjadi" onchange="handlePernahTerjadiChange()" class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
+                                <option value="">-- Pilih --</option>
+                                <option value="Ya">Ya</option>
+                                <option value="Tidak">Tidak</option>
+                            </select>
+                            <div id="pernah_terjadi_ya_div" class="mt-2 hidden">
+                                <textarea id="tindakan_pencegahan" rows="2" class="w-full border border-red-300 bg-red-50 rounded-lg p-2.5 outline-none text-sm auto-save" placeholder="Tuliskan langkah/tindakan yang telah diambil untuk mencegah terulangnya kejadian..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <div class="flex justify-end pt-4 border-t border-gray-200">
+                    <button type="button" onclick="promptSaveDraft()" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-all text-sm mr-3">
+                        Simpan Draft (TXT)
+                    </button>
+                    <button type="button" onclick="switchTab('investigasi'); window.scrollTo(0,0);" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-all text-sm">
+                        Lanjut ke Investigasi &rarr;
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="tabInvestigasiContainer" class="hidden">
+            <form id="ikpFormInvestigasi" class="p-5 md:p-8 space-y-8" onsubmit="event.preventDefault();">
+                
+                <div class="border-b border-gray-200 pb-4 mb-6">
+                    <h2 class="text-xl font-bold text-gray-800 uppercase tracking-tight">HASIL INVESTIGASI DAN ANALISA</h2>
+                    <p class="text-xs text-gray-500 mt-1">Formulir lengkap 14 poin investigasi dan analisa IKP.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                    <div class="space-y-6">
+                        
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">1. TIPE INSIDEN DAN SUB TIPE</label>
+                                <button type="button" onclick="generateAIInvestigasi('tipe')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Tipe & Sub Tipe
+                                </button>
+                            </div>
+                            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">A. Tipe Insiden</label>
+                                    <input type="text" id="inv_tipe_insiden" class="inv-input auto-save w-full" placeholder="Cari atau ketik Tipe Insiden..." list="list_tipe_insiden">
+                                    <datalist id="list_tipe_insiden">
+                                        <option value="Administrasi">
+                                        <option value="Proses/Prosedur Pelayanan">
+                                        <option value="Dokumentasi">
+                                        <option value="Alat Medis/Alat Kesehatan">
+                                        <option value="Perilaku Pasien">
+                                        <option value="Pasien Jatuh">
+                                        <option value="Pasien Kecelakaan">
+                                        <option value="Infrastruktur/Bangunan">
+                                        <option value="Resource/Manajemen Organisasi">
+                                        <option value="Infeksi Nosokomial">
+                                        <option value="Medikasi/Cairan Infus">
+                                        <option value="Nutrisi">
+                                        <option value="Oksigen/Gas">
+                                        <option value="Laboratorium/Patologi">
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">B. Sub Tipe Insiden</label>
+                                    <input type="text" id="inv_subtipe_insiden" class="inv-input auto-save w-full" placeholder="Cari atau ketik Sub Tipe Insiden...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">2. TIPE HARM DAN CAUSA (KODE ICD-10)</label>
+                                <button type="button" onclick="generateAIInvestigasi('harm_causa')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Harm & Causa
+                                </button>
+                            </div>
+                            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">A. Tipe Harm (Dampak/Cedera) & Kode ICD-10</label>
+                                    <input type="text" id="inv_tipe_harm" class="inv-input auto-save w-full" placeholder="Cth: S67.0 - Crushing injury of thumb...">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">B. Causa (Penyebab Eksternal) & Kode ICD-10</label>
+                                    <input type="text" id="inv_causa" class="inv-input auto-save w-full" placeholder="Cth: W18.2 - Other fall on same level...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="inv-label mb-2">3. Masalah</label>
+                            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                                <div class="relative">
+                                    <div class="flex justify-between items-end mb-1">
+                                        <label class="text-[11px] font-semibold text-gray-600 block">A. Asuhan pelayanan/Care Management Problem (CMP)</label>
+                                        <button type="button" onclick="generateAIInvestigasi('masalah_cmp')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                            ✨ AI CMP
+                                        </button>
+                                    </div>
+                                    <textarea id="inv_masalah_cmp" rows="2" class="inv-input auto-save w-full"></textarea>
+                                </div>
+                                <div class="relative">
+                                    <div class="flex justify-between items-end mb-1">
+                                        <label class="text-[11px] font-semibold text-gray-600 block">B. Masalah Pelayanan / Service Delivery Problem (SDP)</label>
+                                        <button type="button" onclick="generateAIInvestigasi('masalah_sdp')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                            ✨ AI SDP
+                                        </button>
+                                    </div>
+                                    <textarea id="inv_masalah_sdp" rows="2" class="inv-input auto-save w-full"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">4. Penyebab Insiden</label>
+                                <button type="button" onclick="generateAIInvestigasi('penyebab')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Penyebab
+                                </button>
+                            </div>
+                            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">A. Penyebab Langsung</label>
+                                    <textarea id="inv_penyebab_langsung" rows="2" class="inv-input auto-save w-full"></textarea>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1 flex justify-between">
+                                        B. Akar Masalah
+                                        <button type="button" onclick="generateAIInvestigasi('akar')" class="text-[9px] text-indigo-600 hover:underline">✨ AI 5-Why</button>
+                                    </label>
+                                    <textarea id="inv_akar_masalah" rows="3" class="inv-input auto-save w-full"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">5. Orang yang terlibat sebagai penyebab langsung insiden</label>
+                                <button type="button" onclick="generateAIInvestigasi('orang_terlibat')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Orang Terlibat
+                                </button>
+                            </div>
+                            <input type="text" id="inv_orang_terlibat" class="inv-input auto-save w-full" list="list_orang" placeholder="Pilih atau ketik...">
+                            <datalist id="list_orang">
+                                <option value="Dokter">
+                                <option value="Perawat/Bidan">
+                                <option value="Petugas Farmasi">
+                                <option value="Analis Laboratorium">
+                                <option value="Pasien/Keluarga">
+                            </datalist>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">6. Proses / fase pelayanan saat terjadi insiden</label>
+                                <button type="button" onclick="generateAIInvestigasi('proses_fase')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Proses/Fase
+                                </button>
+                            </div>
+                            <input type="text" id="inv_proses_fase" class="inv-input auto-save w-full" list="list_fase" placeholder="Pilih atau ketik...">
+                            <datalist id="list_fase">
+                                <option value="Pendaftaran / Rekam Medis">
+                                <option value="Pemeriksaan Medis">
+                                <option value="Tindakan / Prosedur">
+                                <option value="Pemberian Obat / Farmasi">
+                            </datalist>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">7. Faktor-faktor Kontributor</label>
+                                <button type="button" onclick="generateAIInvestigasi('faktor')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Faktor & Komponen
+                                </button>
+                            </div>
+                            <div class="space-y-2">
+                                <input type="text" id="inv_faktor_1" class="inv-input auto-save w-full" placeholder="1.">
+                                <input type="text" id="inv_faktor_2" class="inv-input auto-save w-full" placeholder="2.">
+                                <input type="text" id="inv_faktor_3" class="inv-input auto-save w-full" placeholder="3.">
+                                <input type="text" id="inv_faktor_4" class="inv-input auto-save w-full" placeholder="4.">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">8. Faktor Mitigasi</label>
+                                <button type="button" onclick="generateAIInvestigasi('mitigasi')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Faktor Mitigasi
+                                </button>
+                            </div>
+                            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">a. Untuk Pasien</label>
+                                    <input type="text" id="inv_mitigasi_pasien" class="inv-input auto-save w-full" list="list_mitigasi">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">b. Untuk Petugas</label>
+                                    <input type="text" id="inv_mitigasi_petugas" class="inv-input auto-save w-full">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">c. Untuk Fasyankes</label>
+                                    <input type="text" id="inv_mitigasi_fasyankes" class="inv-input auto-save w-full" list="list_mitigasi">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">d. Untuk Faktor penyebab terkait</label>
+                                    <input type="text" id="inv_mitigasi_faktor" class="inv-input auto-save w-full" list="list_mitigasi">
+                                </div>
+                            </div>
+                            <datalist id="list_mitigasi">
+                                <option value="Tersedia SOP/Pedoman">
+                                <option value="Tersedia Pelatihan">
+                                <option value="Supervisi/Pengecekan Berlapis">
+                                <option value="Tidak Ada Mitigasi">
+                            </datalist>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">9. Cara mendeteksi insiden</label>
+                                <button type="button" onclick="generateAIInvestigasi('deteksi')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Deteksi
+                                </button>
+                            </div>
+                            <input type="text" id="inv_cara_deteksi" class="inv-input auto-save w-full" list="list_deteksi">
+                            <datalist id="list_deteksi">
+                                <option value="Laporan Petugas">
+                                <option value="Keluhan Pasien/Keluarga">
+                                <option value="Audit / Ronde Keselamatan">
+                                <option value="Sistem Alarm / Peringatan">
+                            </datalist>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">10. Dampak pada Fasyankes</label>
+                                <button type="button" onclick="generateAIInvestigasi('dampak_fasyankes')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Dampak
+                                </button>
+                            </div>
+                            <input type="text" id="inv_dampak_fasyankes" class="inv-input auto-save w-full" list="list_dampak_fas">
+                            <datalist id="list_dampak_fas">
+                                <option value="Tuntutan Hukum / Komplain">
+                                <option value="Kerugian Finansial / Reputasi">
+                                <option value="Penurunan Kepercayaan Masyarakat">
+                                <option value="Tidak Berdampak Signifikan">
+                            </datalist>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">11. Rekomendasi</label>
+                                <button type="button" onclick="generateAIInvestigasi('rekomendasi')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Rekomendasi
+                                </button>
+                            </div>
+                            <textarea id="inv_rekomendasi_akhir" rows="3" class="inv-input auto-save w-full"></textarea>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">12. Tindakan yang akan dilakukan</label>
+                                <button type="button" onclick="generateAIInvestigasi('tindakan_akan')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Tindakan
+                                </button>
+                            </div>
+                            <textarea id="inv_tindakan_akan" rows="3" class="inv-input auto-save w-full"></textarea>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">13. Tindakan perbaikan</label>
+                                <button type="button" onclick="generateAIInvestigasi('tindakan_perbaikan')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Perbaikan
+                                </button>
+                            </div>
+                            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">a. Kepada Pasien</label>
+                                    <input type="text" id="inv_perbaikan_pasien" class="inv-input auto-save w-full" list="list_perbaikan">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">b. Kepada Fasyankes</label>
+                                    <input type="text" id="inv_perbaikan_fasyankes" class="inv-input auto-save w-full" list="list_perbaikan">
+                                </div>
+                            </div>
+                            <datalist id="list_perbaikan">
+                                <option value="Observasi Lanjutan">
+                                <option value="Perbaikan Prosedur/SOP">
+                                <option value="Edukasi/Pelatihan Ulang">
+                                <option value="Penggantian Alat">
+                            </datalist>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-end mb-2">
+                                <label class="inv-label mb-0">14. Tindakan untuk mengurangi risiko</label>
+                                <button type="button" onclick="generateAIInvestigasi('tindakan_kurangi_risiko')" class="text-[10px] bg-indigo-100 hover:bg-indigo-200 text-indigo-700 py-1 px-2 rounded font-bold transition flex items-center border border-indigo-200">
+                                    ✨ AI Mitigasi Risiko
+                                </button>
+                            </div>
+                            <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">a. Kepada Pasien</label>
+                                    <input type="text" id="inv_kurangi_pasien" class="inv-input auto-save w-full" list="list_kurangi">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">b. Kepada Petugas</label>
+                                    <input type="text" id="inv_kurangi_petugas" class="inv-input auto-save w-full" list="list_kurangi">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">c. Untuk Fasyankes / Lingkungan</label>
+                                    <input type="text" id="inv_kurangi_fasyankes" class="inv-input auto-save w-full" list="list_kurangi">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-semibold text-gray-600 block mb-1">d. Faktor yang mempengaruhi</label>
+                                    <input type="text" id="inv_kurangi_faktor" class="inv-input auto-save w-full" list="list_kurangi">
+                                </div>
+                            </div>
+                            <datalist id="list_kurangi">
+                                <option value="Pemasangan Sign/Rambu">
+                                <option value="Sosialisasi Rutin">
+                                <option value="Pengawasan Ketat">
+                                <option value="Briefing / Handover">
+                            </datalist>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="flex justify-between pt-4 border-t border-gray-200 mt-8">
+                    <button type="button" onclick="switchTab('laporan')" class="text-teal-700 hover:text-teal-900 font-bold py-3 px-4 text-sm">
+                        &larr; Kembali ke Form
+                    </button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="promptSaveDraft()" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-all text-sm">
+                            Simpan Draft (TXT)
+                        </button>
+                        <button type="button" onclick="generatePDF()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-all text-sm flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            Cetak PDF
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- WADAH KHUSUS CETAK PDF -->
+    <div id="printViewContainer" class="hidden">
+        <div id="printContent" class="print-content bg-white w-[210mm] min-h-[297mm] mx-auto p-10 text-black">
+            <h1 class="text-center font-bold text-xl mb-1 uppercase">LAPORAN INSIDEN KESELAMATAN PASIEN (IKP)</h1>
+            <h2 class="text-center font-bold text-md mb-6 uppercase">INTERNAL PUSKESMAS</h2>
+            
+            <table class="print-table">
+                <tr><th colspan="2" class="font-bold text-center">A. DATA PASIEN</th></tr>
+                <tr><td width="35%">1. Kelompok Umur</td><td width="65%" id="pr_kelompok_umur"></td></tr>
+                <tr><td>2. Umur Detail</td><td id="pr_umur_detail"></td></tr>
+                <tr><td>3. Penanggung Biaya</td><td id="pr_penanggung_biaya"></td></tr>
+                <tr><td>4. Jenis Kelamin</td><td id="pr_jenis_kelamin"></td></tr>
+                <tr><td>5. Tanggal Mendapatkan Pelayanan</td><td id="pr_tgl_pelayanan"></td></tr>
+            </table>
+
+            <table class="print-table">
+                <tr><th colspan="2" class="font-bold text-center">B. RINCIAN KEJADIAN</th></tr>
+                <tr><td width="35%">1. Tanggal & Waktu Insiden</td><td width="65%" id="pr_waktu_insiden"></td></tr>
+                <tr><td>2. Insiden</td><td id="pr_insiden"></td></tr>
+                <tr><td>3. Kronologis Insiden</td><td id="pr_kronologis" class="whitespace-pre-wrap"></td></tr>
+                <tr><td>4. Pelayanan Tujuan Awal</td><td id="pr_pelayanan_awal"></td></tr>
+                <tr><td>5. Jenis Insiden</td><td id="pr_jenis_insiden"></td></tr>
+                <tr><td>6. Dampak Insiden</td><td id="pr_dampak"></td></tr>
+                <tr><td>7. Probabilitas</td><td id="pr_probabilitas"></td></tr>
+                <tr><td>Grading Risiko (Otomatis)</td><td id="pr_grading"></td></tr>
+                <tr><td>8. Orang Pertama Melaporkan</td><td id="pr_pelapor"></td></tr>
+                <tr><td>9. Insiden Terjadi Pada</td><td id="pr_lokasi"></td></tr>
+                <tr><td>10. Tempat Insiden</td><td id="pr_tempat"></td></tr>
+                <tr><td>11. Jenis Pelayanan Terkait</td><td id="pr_pelayanan_terkait"></td></tr>
+                <tr><td>12. Tindakan Segera & Hasilnya</td><td id="pr_tindakan_segera"></td></tr>
+                <tr><td>13. Tindak Lanjut Oleh</td><td id="pr_tindak_lanjut_oleh"></td></tr>
+                <tr><td>14. Pernah Terjadi Sebelumnya?</td><td id="pr_pernah_terjadi"></td></tr>
+            </table>
+
+            <table class="print-table" id="pr_investigasi_table">
+                <tr><th colspan="2" class="font-bold text-center">HASIL INVESTIGASI DAN ANALISA</th></tr>
+                <tr>
+                    <td width="35%">1. Tipe Insiden dan Sub Tipe</td>
+                    <td width="65%">
+                        <table class="print-sub-table">
+                            <tr><td><strong>TIPE:</strong> <span id="pr_inv_1_tipe"></span></td></tr>
+                            <tr><td><strong>SUB TIPE:</strong> <span id="pr_inv_1_subtipe"></span></td></tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>2. Tipe Harm dan Causa</td>
+                    <td>
+                        <table class="print-sub-table">
+                            <tr><td><strong>HARM:</strong> <span id="pr_inv_2_harm"></span></td></tr>
+                            <tr><td><strong>CAUSA:</strong> <span id="pr_inv_2_causa"></span></td></tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>3. Masalah</td>
+                    <td>
+                        <table class="print-sub-table">
+                            <tr><td><strong>A. CMP:</strong> <span id="pr_inv_3a"></span></td></tr>
+                            <tr><td><strong>B. SDP:</strong> <span id="pr_inv_3b"></span></td></tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>4. Penyebab Insiden</td>
+                    <td>
+                        <table class="print-sub-table">
+                            <tr><td><strong>A. Langsung:</strong> <span id="pr_inv_4a"></span></td></tr>
+                            <tr><td><strong>B. Akar:</strong> <span id="pr_inv_4b" class="whitespace-pre-wrap"></span></td></tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr><td>5. Orang yang terlibat</td><td id="pr_inv_5"></td></tr>
+                <tr><td>6. Proses/fase pelayanan</td><td id="pr_inv_6"></td></tr>
+                <tr>
+                    <td>7. Faktor Kontributor</td>
+                    <td>
+                        <ul class="list-disc pl-4 m-0" id="pr_inv_7_list"></ul>
+                    </td>
+                </tr>
+                <tr>
+                    <td>8. Faktor Mitigasi</td>
+                    <td>
+                        <table class="print-sub-table">
+                            <tr><td><strong>a. Pasien:</strong> <span id="pr_inv_8a"></span></td></tr>
+                            <tr><td><strong>b. Petugas:</strong> <span id="pr_inv_8b"></span></td></tr>
+                            <tr><td><strong>c. Fasyankes:</strong> <span id="pr_inv_8c"></span></td></tr>
+                            <tr><td><strong>d. Faktor Penyebab:</strong> <span id="pr_inv_8d"></span></td></tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr><td>9. Cara mendeteksi insiden</td><td id="pr_inv_9"></td></tr>
+                <tr><td>10. Dampak pada Fasyankes</td><td id="pr_inv_10"></td></tr>
+                <tr><td>11. Rekomendasi</td><td id="pr_inv_11"></td></tr>
+                <tr><td>12. Tindakan yang akan dilakukan</td><td id="pr_inv_12"></td></tr>
+                <tr>
+                    <td>13. Tindakan perbaikan</td>
+                    <td>
+                        <table class="print-sub-table">
+                            <tr><td><strong>a. Kepada Pasien:</strong> <span id="pr_inv_13a"></span></td></tr>
+                            <tr><td><strong>b. Kepada Fasyankes:</strong> <span id="pr_inv_13b"></span></td></tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>14. Tindakan untuk mengurangi risiko</td>
+                    <td>
+                        <table class="print-sub-table">
+                            <tr><td><strong>a. Pasien:</strong> <span id="pr_inv_14a"></span></td></tr>
+                            <tr><td><strong>b. Petugas:</strong> <span id="pr_inv_14b"></span></td></tr>
+                            <tr><td><strong>c. Fasyankes/Lingkungan:</strong> <span id="pr_inv_14c"></span></td></tr>
+                            <tr><td><strong>d. Faktor Pengaruh:</strong> <span id="pr_inv_14d"></span></td></tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="mt-12 flex justify-between px-10">
+                <div class="text-center">
+                    <p class="mb-20">Pelapor,</p>
+                    <p class="border-b border-black pb-1 min-w-[150px] inline-block"></p>
+                </div>
+                <div class="text-center">
+                    <p class="mb-20">Penerima Laporan,</p>
+                    <p class="border-b border-black pb-1 min-w-[150px] inline-block"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CUSTOM UNTUK MENGGANTIKAN ALERT/PROMPT/CONFIRM BAWAAN -->
+    <div id="customModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50 px-4">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full transform transition-all scale-95 opacity-0 duration-200" id="customModalContent">
+            <h3 class="font-bold text-lg mb-2 text-gray-800" id="customModalTitle">Judul Modal</h3>
+            <p class="text-sm text-gray-600 mb-5 leading-relaxed" id="customModalBody">Pesan modal disini.</p>
+            
+            <input type="password" id="customModalInput" class="w-full border border-gray-300 p-3 rounded-xl mb-5 text-sm hidden outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" placeholder="...">
+            
+            <div class="flex justify-end gap-3" id="customModalActions">
+                <!-- Tombol dinamis -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const apiKey = ""; 
+        let autoSaveTimer = null;
+
+        window.onload = () => {
+            setupAutoSave();
+            loadDraftFromLocalStorage();
+            calculateGrading();
+        };
+
+        // --- SISTEM MODAL CUSTOM (Anti-Blokir iframe) ---
+        function showCustomModal(options) {
+            const modal = document.getElementById('customModal');
+            const content = document.getElementById('customModalContent');
+            const input = document.getElementById('customModalInput');
+            const actionsDiv = document.getElementById('customModalActions');
+            
+            document.getElementById('customModalTitle').innerText = options.title || 'Informasi';
+            document.getElementById('customModalBody').innerText = options.body || '';
+            
+            if (options.type === 'prompt') {
+                input.style.display = 'block';
+                input.value = '';
+                input.placeholder = options.placeholder || '';
+                setTimeout(() => input.focus(), 100);
+            } else {
+                input.style.display = 'none';
+            }
+            
+            actionsDiv.innerHTML = '';
+            
+            if (options.type !== 'alert') {
+                const btnCancel = document.createElement('button');
+                btnCancel.className = 'px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors';
+                btnCancel.innerText = 'Batal';
+                btnCancel.onclick = () => { 
+                    closeCustomModal(); 
+                    if(options.onCancel) options.onCancel(); 
+                };
+                actionsDiv.appendChild(btnCancel);
+            }
+            
+            const btnConfirm = document.createElement('button');
+            btnConfirm.className = `px-5 py-2.5 text-white rounded-xl text-sm font-bold transition-colors ${options.confirmColor || 'bg-teal-600 hover:bg-teal-700'}`;
+            btnConfirm.innerText = options.confirmText || 'OK';
+            btnConfirm.onclick = () => { 
+                const val = input.value;
+                closeCustomModal(); 
+                if(options.onConfirm) options.onConfirm(val); 
+            };
+            actionsDiv.appendChild(btnConfirm);
+            
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeCustomModal() {
+            const modal = document.getElementById('customModal');
+            const content = document.getElementById('customModalContent');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 200);
+        }
+
+        // --- TAB NAVIGATION ---
+        function switchTab(tab) {
+            const btnLaporan = document.getElementById('btnTabLaporan');
+            const btnInvestigasi = document.getElementById('btnTabInvestigasi');
+            const conLaporan = document.getElementById('tabLaporanContainer');
+            const conInvestigasi = document.getElementById('tabInvestigasiContainer');
+
+            if (tab === 'laporan') {
+                btnLaporan.className = "flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-active uppercase transition-all";
+                btnInvestigasi.className = "flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-inactive uppercase transition-all";
+                conLaporan.classList.remove('hidden');
+                conInvestigasi.classList.add('hidden');
+            } else {
+                btnLaporan.className = "flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-inactive uppercase transition-all";
+                btnInvestigasi.className = "flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-active uppercase transition-all";
+                conLaporan.classList.add('hidden');
+                conInvestigasi.classList.remove('hidden');
+            }
+        }
+
+        // --- UTILS (UI Branching) ---
+        function toggleLainnya(selectEl, targetDivId, targetInputId) {
+            const div = document.getElementById(targetDivId);
+            if (selectEl.value === 'Lain-lain') {
+                div.style.display = 'block';
+            } else {
+                div.style.display = 'none';
+                document.getElementById(targetInputId).value = '';
+            }
+            triggerAutoSave();
+        }
+
+        function handlePelaporChange() {
+            const val = document.getElementById('pelapor_pertama').value;
+            const nakesDiv = document.getElementById('pelapor_nakes_div');
+            const lainDiv = document.getElementById('pelapor_lain_div');
+            
+            nakesDiv.style.display = val === 'Tenaga Kesehatan' ? 'block' : 'none';
+            lainDiv.style.display = val === 'Lain-lain' ? 'block' : 'none';
+            
+            if(val !== 'Tenaga Kesehatan') document.getElementById('pelapor_nakes').value = '';
+            if(val !== 'Lain-lain') {
+                document.getElementById('pelapor_lain').value = '';
+                if (val !== 'Tenaga Kesehatan') document.getElementById('pelapor_lain').value = '';
+            }
+            triggerAutoSave();
+        }
+
+        function handlePelaporNakesChange() {
+            const val = document.getElementById('pelapor_nakes').value;
+            const lainDiv = document.getElementById('pelapor_lain_div');
+            if (val === 'Petugas Lainnya') {
+                lainDiv.style.display = 'block';
+            } else {
+                lainDiv.style.display = document.getElementById('pelapor_pertama').value === 'Lain-lain' ? 'block' : 'none';
+                document.getElementById('pelapor_lain').value = '';
+            }
+            triggerAutoSave();
+        }
+
+        function handleTindakLanjutChange() {
+            const val = document.getElementById('tindak_lanjut_oleh').value;
+            const detailDiv = document.getElementById('tindak_lanjut_detail_div');
+            if (val === 'Tim' || val === 'Petugas Lainnya') {
+                detailDiv.style.display = 'block';
+            } else {
+                detailDiv.style.display = 'none';
+                document.getElementById('tindak_lanjut_detail').value = '';
+            }
+            triggerAutoSave();
+        }
+
+        function handlePernahTerjadiChange() {
+            const val = document.getElementById('pernah_terjadi').value;
+            const yaDiv = document.getElementById('pernah_terjadi_ya_div');
+            if (val === 'Ya') {
+                yaDiv.style.display = 'block';
+            } else {
+                yaDiv.style.display = 'none';
+                document.getElementById('tindakan_pencegahan').value = '';
+            }
+            triggerAutoSave();
+        }
+
+        // --- GRADING MATRIX LOGIC ---
+        function updateDampakInsiden() {
+            const jenis = document.getElementById('jenis_insiden').value;
+            const dampak = document.getElementById('dampak_insiden');
+            
+            if (jenis.includes('Sentinel')) {
+                dampak.value = "5";
+            } else if (jenis.includes('KTD')) {
+                if (parseInt(dampak.value) < 2 || parseInt(dampak.value) > 4) dampak.value = "3";
+            } else if (jenis.includes('KTC') || jenis.includes('KNC') || jenis.includes('KPC')) {
+                dampak.value = "1";
+            }
+            calculateGrading();
+            triggerAutoSave();
+        }
+
+        function calculateGrading() {
+            const dVal = parseInt(document.getElementById('dampak_insiden').value) || 0;
+            const pVal = parseInt(document.getElementById('probabilitas').value) || 0;
+            const resultDiv = document.getElementById('grading_result');
+            const hiddenVal = document.getElementById('grading_value');
+            
+            if (dVal === 0 || pVal === 0) {
+                resultDiv.className = "w-full border border-gray-300 rounded-lg p-3 text-center text-sm font-bold bg-gray-100 text-gray-500 flex items-center justify-center h-[46px]";
+                resultDiv.innerText = "Pilih Dampak dan Probabilitas";
+                hiddenVal.value = "";
+                return;
+            }
+
+            let skor = dVal * pVal;
+            let warna = "";
+            let label = "";
+
+            if (dVal === 1) {
+                if (pVal <= 2) { warna = "grade-biru"; label = "BIRU (Rendah)"; }
+                else if (pVal <= 4) { warna = "grade-hijau"; label = "HIJAU (Sedang)"; }
+                else { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
+            } 
+            else if (dVal === 2) {
+                if (pVal === 1) { warna = "grade-biru"; label = "BIRU (Rendah)"; }
+                else if (pVal <= 3) { warna = "grade-hijau"; label = "HIJAU (Sedang)"; }
+                else if (pVal === 4) { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
+                else { warna = "grade-merah"; label = "MERAH (Ekstrem)"; }
+            }
+            else if (dVal === 3) {
+                if (pVal === 1) { warna = "grade-hijau"; label = "HIJAU (Sedang)"; }
+                else if (pVal <= 3) { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
+                else { warna = "grade-merah"; label = "MERAH (Ekstrem)"; }
+            }
+            else if (dVal === 4) {
+                if (pVal === 1) { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
+                else { warna = "grade-merah"; label = "MERAH (Ekstrem)"; }
+            }
+            else if (dVal === 5) {
+                warna = "grade-merah"; label = "MERAH (Ekstrem)"; 
+            }
+
+            resultDiv.className = `w-full border rounded-lg p-3 text-center text-sm font-bold transition-colors flex items-center justify-center h-[46px] ${warna}`;
+            resultDiv.innerText = `Skor: ${skor} - ${label}`;
+            hiddenVal.value = label;
+            triggerAutoSave();
+        }
+
+        // --- GEMINI AI LOGIC ---
+        async function fetchGeminiWithBackoff(prompt, maxRetries = 5) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: "Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta." }] }
+            };
+
+            let retries = 0;
+            const delays = [1000, 2000, 4000, 8000, 16000];
+
+            while (retries < maxRetries) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const data = await response.json();
+                    if (data.candidates && data.candidates[0].content.parts[0].text) {
+                        return data.candidates[0].content.parts[0].text;
+                    } else {
+                        throw new Error("Format respons API tidak sesuai");
+                    }
+                } catch (error) {
+                    retries++;
+                    if (retries >= maxRetries) throw error;
+                    await new Promise(resolve => setTimeout(resolve, delays[retries-1]));
+                }
+            }
+        }
+
+        // AI Fungsi 1: Narasi
+        async function generateNarasi() {
+            const rawText = document.getElementById('kronologis_insiden').value.trim();
+            if (!rawText) {
+                showMessage('Isi kronologis insiden terlebih dahulu!', 'error');
+                return;
+            }
+
+            const container = document.getElementById('narasi_result_container');
+            const textarea = document.getElementById('final_narasi');
+            const btn = event.currentTarget;
+            const originalHTML = btn.innerHTML;
+            
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> MEMPROSES AI...`;
+            btn.disabled = true;
+            container.classList.remove('hidden');
+            textarea.value = "Mengumpulkan informasi dan menyusun narasi medis...";
+            textarea.classList.add('bg-ai-gradient');
+
+            const prompt = `Susunlah sebuah narasi medis baku untuk laporan Insiden Keselamatan Pasien (IKP) berdasarkan catatan kronologis berikut:\n\n${rawText}\n\nATURAN WAJIB:\n1. Gabungkan menjadi 1 paragraf narasi yang mengalir, profesional, dan objektif.\n2. Tuliskan HANYA narasinya saja secara LANGSUNG (tidak ada basa-basi).\n3. JANGAN berikan beberapa opsi/pilihan narasi.`;
+
+            try {
+                const resultText = await fetchGeminiWithBackoff(prompt);
+                textarea.value = resultText.trim();
+                triggerAutoSave();
+            } catch (error) {
+                textarea.value = "Gagal menghubungi AI. \n\nGabungan Manual:\n" + rawText;
+                showMessage("Gagal menggunakan AI. Pastikan layanan tidak terganggu.", "error");
+            } finally {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                textarea.classList.remove('bg-ai-gradient');
+            }
+        }
+
+        // AI Fungsi 2: Saran Grading
+        async function generateAIGrading() {
+            const narasi = document.getElementById('final_narasi').value.trim() || document.getElementById('kronologis_insiden').value.trim();
+            const namaInsiden = document.getElementById('insiden').value;
+            const pelayananAwal = document.getElementById('pelayanan_awal').value;
+
+            if (!narasi && !namaInsiden) {
+                showMessage("Lengkapi Nama Insiden dan Kronologis terlebih dahulu agar AI punya referensi analisis.", "warning");
+                return;
+            }
+
+            const btn = document.getElementById('btnAIGrading');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> MEMPROSES AI...`;
+            btn.disabled = true;
+
+            const box = document.getElementById('ai_suggestion_box');
+            const content = document.getElementById('ai_suggestion_content');
+            box.classList.remove('hidden');
+            content.innerHTML = `<span class="animate-pulse font-bold text-indigo-400">Sedang menganalisis matriks risiko berdasarkan kronologis kejadian...</span>`;
+
+            const prompt = `Berdasarkan data insiden berikut:\nNama Insiden: ${namaInsiden}\nPelayanan Tujuan Awal: ${pelayananAwal || '-'}\nKronologis: ${narasi}\n\nTugas Anda:\nBerikan rekomendasi penilaian untuk 3 parameter matriks risiko pelaporan IKP secara ringkas.\n1. Saran Jenis Insiden (Pilih satu: KTD, Kejadian Sentinel, KTC, KNC, KPC)\n2. Saran Dampak/Severity (Pilih satu: 1-Tidak Cedera, 2-Cedera Ringan, 3-Cedera Sedang, 4-Cedera Berat, 5-Kematian)\n3. Saran Probabilitas/Frekuensi (Pilih satu: 1-Sangat Jarang s/d 5-Sangat Sering)\n\nTuliskan dalam format poin-poin yang rapi.`;
+
+            try {
+                const resultText = await fetchGeminiWithBackoff(prompt);
+                content.innerText = resultText.trim();
+                showMessage("Saran Grading AI berhasil dimuat.", "success");
+            } catch (error) {
+                content.innerText = "Gagal memuat saran AI. Pastikan koneksi internet lancar.";
+                showMessage("Gagal menganalisis grading.", "error");
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        }
+
+        // AI Fungsi 3: INVESTIGASI SEDERHANA HASIL ANALISA 14 POIN
+        async function generateAIInvestigasi(type) {
+            const narasi = document.getElementById('final_narasi').value.trim() || document.getElementById('kronologis_insiden').value.trim();
+            const namaInsiden = document.getElementById('insiden').value;
+
+            if (!narasi && !namaInsiden) {
+                showMessage("Lengkapi Nama Insiden dan Kronologis (Form 1) terlebih dahulu agar AI punya konteks.", "warning");
+                return;
+            }
+
+            let prompt = "";
+            let targetIds = [];
+            let btn = event.currentTarget;
+            let originalHtml = btn.innerHTML;
+
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-3 w-3 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Proses...`;
+            btn.disabled = true;
+
+            const context = `Nama Insiden: ${namaInsiden}\nKronologis: ${narasi}\n`;
+
+            if (type === 'tipe') {
+                targetIds = ['inv_tipe_insiden', 'inv_subtipe_insiden'];
+                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Tipe Insiden" dan "Sub Tipe Insiden" berdasarkan daftar Referensi IKP Kemenkes RI.\nATURAN WAJIB: Jawab dengan format persis seperti ini:\nTIPE: [jawaban tipe]\nSUB TIPE: [jawaban sub tipe]`;
+            } else if (type === 'harm_causa') {
+                targetIds = ['inv_tipe_harm', 'inv_causa'];
+                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Tipe Harm" dan "Causa" beserta Kode ICD-10 yang paling spesifik.\nATURAN WAJIB:\nHARM: [kode ICD-10] - [Deskripsi] ([Terjemahan])\nCAUSA: [kode ICD-10] - [Deskripsi] ([Terjemahan])`;
+            } else if (type === 'masalah_cmp') {
+                targetIds = ['inv_masalah_cmp'];
+                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Care Management Problem (CMP)". Tuliskan HANYA poin masalahnya. Jika tidak ada, tuliskan "Tidak ada".`;
+            } else if (type === 'masalah_sdp') {
+                targetIds = ['inv_masalah_sdp'];
+                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Service Delivery Problem (SDP)". Tuliskan HANYA poin masalahnya. Jika tidak ada, tuliskan "Tidak ada".`;
+            } else if (type === 'penyebab') {
+                targetIds = ['inv_penyebab_langsung'];
+                const cmp = document.getElementById('inv_masalah_cmp').value || 'Tidak ada';
+                const sdp = document.getElementById('inv_masalah_sdp').value || 'Tidak ada';
+                prompt = `Berdasarkan data insiden:\n${context}\nMasalah CMP: ${cmp}\nMasalah SDP: ${sdp}\nSebutkan "Penyebab Langsung" (Immediate Cause) secara ringkas.`;
+            } else if (type === 'akar') {
+                targetIds = ['inv_akar_masalah'];
+                const penyebab = document.getElementById('inv_penyebab_langsung').value;
+                prompt = `Berdasarkan data insiden:\n${context}\nPenyebab Langsung: ${penyebab}\nLakukan "5-Why" untuk mencari akar masalah.`;
+            } else if (type === 'orang_terlibat') {
+                targetIds = ['inv_orang_terlibat'];
+                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan "Orang yang terlibat" sebagai penyebab langsung. Tuliskan profesi/pihaknya saja.`;
+            } else if (type === 'proses_fase') {
+                targetIds = ['inv_proses_fase'];
+                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan "Proses / fase pelayanan" saat insiden. Tuliskan nama fasenya saja.`;
+            } else if (type === 'faktor') {
+                targetIds = ['inv_faktor_1']; 
+                const akar = document.getElementById('inv_akar_masalah').value;
+                prompt = `Berdasarkan data insiden:\n${context}\nAkar Masalah: ${akar}\nSebutkan maksimal 4 "Faktor Kontributor" (FAKTOR STAF, PASIEN, EKSTERNAL, FASYANKES, LINGKUNGAN). AWALI baris dengan angka "1. " dst.`;
+            } else if (type === 'mitigasi') {
+                targetIds = ['inv_mitigasi_pasien', 'inv_mitigasi_petugas', 'inv_mitigasi_fasyankes', 'inv_mitigasi_faktor'];
+                const akar = document.getElementById('inv_akar_masalah').value || 'Belum diidentifikasi';
+                prompt = `Berdasarkan data insiden:\n${context}\nAkar Masalah: ${akar}\nSebutkan "Faktor Mitigasi" (kondisi untuk meminimalisir dampak).\nATURAN WAJIB:\nPASIEN: [mitigasi]\nPETUGAS: [mitigasi]\nFASYANKES: [mitigasi]\nFAKTOR: [mitigasi]`;
+            } else if (type === 'deteksi') {
+                targetIds = ['inv_cara_deteksi'];
+                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan "Cara mendeteksi insiden" yang paling logis. Tuliskan caranya saja.`;
+            } else if (type === 'dampak_fasyankes') {
+                targetIds = ['inv_dampak_fasyankes'];
+                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan perkiraan "Dampak pada Fasyankes". Tuliskan dampaknya saja.`;
+            } else if (type === 'rekomendasi') {
+                targetIds = ['inv_rekomendasi_akhir'];
+                const akar = document.getElementById('inv_akar_masalah').value;
+                prompt = `Akar Masalah: ${akar}\nSebutkan rekomendasi perbaikan (Action Plan) spesifik.`;
+            } else if (type === 'tindakan_akan') {
+                targetIds = ['inv_tindakan_akan'];
+                const rekomendasi = document.getElementById('inv_rekomendasi_akhir').value || 'Belum diidentifikasi';
+                prompt = `Berdasarkan data insiden:\n${context}\nRekomendasi: ${rekomendasi}\nSebutkan "Tindakan yang akan dilakukan" secara konkrit.`;
+            } else if (type === 'tindakan_perbaikan') {
+                targetIds = ['inv_perbaikan_pasien', 'inv_perbaikan_fasyankes'];
+                const rekomendasi = document.getElementById('inv_rekomendasi_akhir').value || 'Belum diidentifikasi';
+                prompt = `Berdasarkan data insiden:\n${context}\nRekomendasi: ${rekomendasi}\nSebutkan "Tindakan perbaikan".\nATURAN WAJIB:\nPASIEN: [tindakan]\nFASYANKES: [tindakan]`;
+            } else if (type === 'tindakan_kurangi_risiko') {
+                targetIds = ['inv_kurangi_pasien', 'inv_kurangi_petugas', 'inv_kurangi_fasyankes', 'inv_kurangi_faktor'];
+                const akar = document.getElementById('inv_akar_masalah').value || 'Belum diidentifikasi';
+                prompt = `Berdasarkan data insiden:\n${context}\nAkar Masalah: ${akar}\nSebutkan "Tindakan untuk mengurangi risiko".\nATURAN WAJIB:\nPASIEN: [tindakan]\nPETUGAS: [tindakan]\nFASYANKES: [tindakan]\nFAKTOR: [tindakan]`;
+            }
+
+            try {
+                const resultText = await fetchGeminiWithBackoff(prompt);
+                
+                // Parsing logic untuk yang bercabang
+                if (type === 'tipe') {
+                    const tipeMatch = resultText.match(/TIPE:\s*(.*)/i);
+                    const subTipeMatch = resultText.match(/SUB TIPE:\s*(.*)/i);
+                    if(tipeMatch) document.getElementById('inv_tipe_insiden').value = tipeMatch[1].trim();
+                    if(subTipeMatch) document.getElementById('inv_subtipe_insiden').value = subTipeMatch[1].trim();
+                    if(!tipeMatch && !subTipeMatch) document.getElementById('inv_tipe_insiden').value = resultText.trim();
+                } 
+                else if (type === 'harm_causa') {
+                    const harmMatch = resultText.match(/HARM:\s*(.*)/i);
+                    const causaMatch = resultText.match(/CAUSA:\s*(.*)/i);
+                    if(harmMatch) document.getElementById('inv_tipe_harm').value = harmMatch[1].trim();
+                    if(causaMatch) document.getElementById('inv_causa').value = causaMatch[1].trim();
+                    if(!harmMatch && !causaMatch) document.getElementById('inv_tipe_harm').value = resultText.trim();
+                }
+                else if (type === 'masalah_cmp' || type === 'masalah_sdp') {
+                    document.getElementById(targetIds[0]).value = resultText.trim();
+                }
+                else if (type === 'faktor') {
+                    const lines = resultText.split('\n').filter(line => line.trim().match(/^\d+\./));
+                    if (lines.length > 0) {
+                        if (lines[0]) document.getElementById('inv_faktor_1').value = lines[0].replace(/^\d+\.\s*/, '').trim();
+                        if (lines[1]) document.getElementById('inv_faktor_2').value = lines[1].replace(/^\d+\.\s*/, '').trim();
+                        if (lines[2]) document.getElementById('inv_faktor_3').value = lines[2].replace(/^\d+\.\s*/, '').trim();
+                        if (lines[3]) document.getElementById('inv_faktor_4').value = lines[3].replace(/^\d+\.\s*/, '').trim();
+                    } else {
+                        document.getElementById('inv_faktor_1').value = resultText.trim();
+                    }
+                }
+                else if (type === 'mitigasi') {
+                    const match1 = resultText.match(/PASIEN:\s*(.*)/i);
+                    const match2 = resultText.match(/PETUGAS:\s*(.*)/i);
+                    const match3 = resultText.match(/FASYANKES:\s*(.*)/i);
+                    const match4 = resultText.match(/FAKTOR:\s*(.*)/i);
+                    if(match1) document.getElementById('inv_mitigasi_pasien').value = match1[1].trim();
+                    if(match2) document.getElementById('inv_mitigasi_petugas').value = match2[1].trim();
+                    if(match3) document.getElementById('inv_mitigasi_fasyankes').value = match3[1].trim();
+                    if(match4) document.getElementById('inv_mitigasi_faktor').value = match4[1].trim();
+                }
+                else if (type === 'tindakan_perbaikan') {
+                    const match1 = resultText.match(/PASIEN:\s*(.*)/i);
+                    const match2 = resultText.match(/FASYANKES:\s*(.*)/i);
+                    if(match1) document.getElementById('inv_perbaikan_pasien').value = match1[1].trim();
+                    if(match2) document.getElementById('inv_perbaikan_fasyankes').value = match2[1].trim();
+                } 
+                else if (type === 'tindakan_kurangi_risiko') {
+                    const match1 = resultText.match(/PASIEN:\s*(.*)/i);
+                    const match2 = resultText.match(/PETUGAS:\s*(.*)/i);
+                    const match3 = resultText.match(/FASYANKES:\s*(.*)/i);
+                    const match4 = resultText.match(/FAKTOR:\s*(.*)/i);
+                    if(match1) document.getElementById('inv_kurangi_pasien').value = match1[1].trim();
+                    if(match2) document.getElementById('inv_kurangi_petugas').value = match2[1].trim();
+                    if(match3) document.getElementById('inv_kurangi_fasyankes').value = match3[1].trim();
+                    if(match4) document.getElementById('inv_kurangi_faktor').value = match4[1].trim();
+                } 
+                else {
+                    const targetEl = document.getElementById(targetIds[0]);
+                    if (targetEl.tagName === 'INPUT') {
+                        targetEl.value = resultText.replace(/\*/g, '').trim();
+                    } else {
+                        if(targetEl.value.trim() !== '') {
+                            targetEl.value += '\n\n--- SARAN AI ---\n' + resultText.trim();
+                        } else {
+                            targetEl.value = resultText.trim();
+                        }
+                    }
+                }
+
+                triggerAutoSave();
+                showMessage("Saran AI berhasil dimuat", "success");
+            } catch (error) {
+                console.error("AI Error:", error);
+                showMessage("Gagal menganalisis. Cek koneksi Anda.", "error");
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        }
+
+        // --- ENKRIPSI SEDERHANA (XOR) UNTUK PASSWORD DRAFT ---
+        function encryptDecrypt(text, password) {
+            let result = '';
+            for(let i = 0; i < text.length; i++) {
+                result += String.fromCharCode(text.charCodeAt(i) ^ password.charCodeAt(i % password.length));
+            }
+            return result;
+        }
+
+        // --- DATA MANAGEMENT (SAVE/LOAD/AUTO-SAVE) ---
+        function getFormData() {
+            const inputs = document.querySelectorAll('.auto-save');
+            const data = {};
+            inputs.forEach(input => {
+                if(input.id) data[input.id] = input.value;
+            });
+            return data;
+        }
+
+        function fillFormData(data) {
+            if (!data) return;
+            const inputs = document.querySelectorAll('.auto-save');
+            inputs.forEach(input => {
+                if(input.id && data[input.id] !== undefined) {
+                    input.value = data[input.id];
+                    if (input.tagName === 'SELECT') input.dispatchEvent(new Event('change'));
+                }
+            });
+            
+            if (data.kronologis && Array.isArray(data.kronologis)) {
+                document.getElementById('kronologis_insiden').value = data.kronologis.map(k => `[${k.time}] ${k.text}`).join('\n');
+            }
+
+            if (data.final_narasi) document.getElementById('narasi_result_container').classList.remove('hidden');
+            
+            handlePelaporChange();
+            handlePelaporNakesChange();
+            handleTindakLanjutChange();
+            handlePernahTerjadiChange();
+            calculateGrading();
+        }
+
+        function triggerAutoSave() {
+            clearTimeout(autoSaveTimer);
+            showSavingIndicator(true);
+            autoSaveTimer = setTimeout(() => {
+                const data = getFormData();
+                localStorage.setItem('ikp_draft_data', JSON.stringify(data));
+                showSavingIndicator(false);
+            }, 1000);
+        }
+
+        function showSavingIndicator(isSaving) {
+            const ind = document.getElementById('autoSaveIndicator');
+            const txt = document.getElementById('autoSaveText');
+            if (isSaving) {
+                ind.classList.add('saving-active');
+                txt.innerText = "Menyimpan draft...";
+            } else {
+                ind.classList.remove('saving-active');
+                txt.innerText = "Draft tersimpan di browser";
+            }
+        }
+
+        function setupAutoSave() {
+            const inputs = document.querySelectorAll('.auto-save');
+            inputs.forEach(input => {
+                input.addEventListener('input', triggerAutoSave);
+                input.addEventListener('change', triggerAutoSave);
+            });
+        }
+
+        function loadDraftFromLocalStorage() {
+            try {
+                const draft = localStorage.getItem('ikp_draft_data');
+                if (draft) {
+                    fillFormData(JSON.parse(draft));
+                    document.getElementById('autoSaveText').innerText = "Draft dimuat ulang";
+                }
+            } catch (e) {
+                console.error("Gagal load draft lokal", e);
+            }
+        }
+
+        function clearFormSilently() {
+            const inputs = document.querySelectorAll('.auto-save');
+            inputs.forEach(input => {
+                if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
+                else input.value = '';
+            });
+            document.getElementById('narasi_result_container').classList.add('hidden');
+            document.getElementById('ai_suggestion_box').classList.add('hidden');
+            
+            handlePelaporChange();
+            handleTindakLanjutChange();
+            handlePernahTerjadiChange();
+            calculateGrading();
+            
+            localStorage.removeItem('ikp_draft_data');
+            document.getElementById('autoSaveText').innerText = "Sistem Siap";
+        }
+
+        // --- SISTEM MODAL KUSTOM UNTUK MENGGANTIKAN ALERT/PROMPT/CONFIRM ---
+        function resetFormWithConfirm() {
+            showCustomModal({
+                type: 'confirm',
+                title: 'Kosongkan Form',
+                body: 'Yakin ingin mengosongkan semua isian form pelaporan dan investigasi?',
+                confirmText: 'Ya, Kosongkan',
+                confirmColor: 'bg-red-600 hover:bg-red-700',
+                onConfirm: () => {
+                    clearFormSilently();
+                    showMessage("Form berhasil dikosongkan.", "info");
+                }
+            });
+        }
+
+        function promptSaveDraft() {
+            showCustomModal({
+                type: 'prompt',
+                title: 'Simpan Draft File (TXT)',
+                body: 'Anda dapat mengamankan file draft ini dengan password. Biarkan kosong jika tidak ingin diproteksi password.',
+                placeholder: 'Masukkan password opsional...',
+                confirmText: 'Simpan & Unduh',
+                onConfirm: (pwd) => exportData(pwd)
+            });
+        }
+
+        function exportData(pwd) {
+            const data = getFormData();
+            let jsonStr = JSON.stringify(data, null, 2);
+            let finalStr = jsonStr;
+
+            if (pwd && pwd.trim() !== "") {
+                const encryptedData = btoa(encryptDecrypt(encodeURIComponent(jsonStr), pwd));
+                finalStr = "ENC:" + encryptedData;
+            }
+
+            const dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(finalStr);
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `Draft_IKP_${new Date().toISOString().slice(0,10)}.txt`);
+            
+            // Tambahkan elemen ke body sesaat agar support klik di dalam iframe Canvas
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            document.body.removeChild(dlAnchorElem);
+
+            if (pwd && pwd.trim() !== "") {
+                clearFormSilently();
+                showMessage("Draft dikunci dengan password. Form telah dikosongkan otomatis demi keamanan.", "success");
+            } else {
+                showMessage("Draft berhasil disimpan ke komputer Anda.", "success");
+            }
+        }
+
+        function loadDraft(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let content = e.target.result;
+                try {
+                    if (content.startsWith("ENC:")) {
+                        showCustomModal({
+                            type: 'prompt',
+                            title: 'Buka Draft Terkunci',
+                            body: 'File draft ini dilindungi oleh password. Masukkan password Anda untuk membukanya:',
+                            placeholder: 'Password draft',
+                            confirmText: 'Buka File',
+                            onConfirm: (pwd) => {
+                                try {
+                                    const decryptedStr = decodeURIComponent(encryptDecrypt(atob(content.substring(4)), pwd));
+                                    const data = JSON.parse(decryptedStr);
+                                    fillFormData(data);
+                                    showMessage("Draft yang terkunci berhasil dimuat.", "success");
+                                } catch(err) {
+                                    showMessage("Password salah atau file tidak valid.", "error");
+                                }
+                            }
+                        });
+                    } else {
+                        const data = JSON.parse(content);
+                        fillFormData(data);
+                        showMessage("Draft berhasil dimuat.", "success");
+                    }
+                } catch (error) {
+                    showMessage("Gagal memuat. Format file rusak.", "error");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input
+        }
+
+        // --- PDF GENERATION ---
+        function generatePDF() {
+            const v = (id) => {
+                const el = document.getElementById(id);
+                if (!el) return "-";
+                if (el.tagName === 'SELECT') return el.options[el.selectedIndex]?.text || "-";
+                return el.value || "-";
+            };
+            const fDate = (val) => val ? new Date(val).toLocaleString('id-ID') : '-';
+
+            // SEC A
+            document.getElementById('pr_kelompok_umur').innerText = v('kelompok_umur');
+            document.getElementById('pr_umur_detail').innerText = `${v('umur_tahun')} Thn, ${v('umur_bulan')} Bln, ${v('umur_hari')} Hari`;
+            document.getElementById('pr_penanggung_biaya').innerText = v('penanggung_biaya');
+            document.getElementById('pr_jenis_kelamin').innerText = v('jenis_kelamin');
+            document.getElementById('pr_tgl_pelayanan').innerText = fDate(document.getElementById('tgl_pelayanan').value);
+
+            // SEC B
+            document.getElementById('pr_waktu_insiden').innerText = fDate(document.getElementById('waktu_insiden').value);
+            document.getElementById('pr_insiden').innerText = v('insiden');
+            document.getElementById('pr_kronologis').innerText = document.getElementById('final_narasi').value || document.getElementById('kronologis_insiden').value || "-";
+            document.getElementById('pr_jenis_insiden').innerText = v('jenis_insiden');
+            
+            let pelAwal = v('pelayanan_awal');
+            if (pelAwal.includes('Lain')) pelAwal += ` (${v('pelayanan_awal_lain')})`;
+            document.getElementById('pr_pelayanan_awal').innerText = pelAwal;
+
+            document.getElementById('pr_dampak').innerText = v('dampak_insiden');
+            document.getElementById('pr_probabilitas').innerText = v('probabilitas');
+            document.getElementById('pr_grading').innerText = v('grading_value');
+            
+            let pelapor = v('pelapor_pertama');
+            if (pelapor === 'Tenaga Kesehatan') pelapor += ` (${v('pelapor_nakes')})`;
+            if (pelapor.includes('Lain') || pelapor.includes('Lainnya')) pelapor += ` (${v('pelapor_lain')})`;
+            document.getElementById('pr_pelapor').innerText = pelapor;
+
+            document.getElementById('pr_lokasi').innerText = v('lokasi_kejadian');
+
+            let tempat = v('tempat_insiden');
+            if (tempat.includes('Lain')) tempat += ` (${v('tempat_insiden_lain')})`;
+            document.getElementById('pr_tempat').innerText = tempat;
+
+            let pelTerkait = v('pelayanan_terkait');
+            if (pelTerkait.includes('Lain')) pelTerkait += ` (${v('pelayanan_terkait_lain')})`;
+            document.getElementById('pr_pelayanan_terkait').innerText = pelTerkait;
+
+            document.getElementById('pr_tindakan_segera').innerText = v('tindakan_segera');
+            
+            let t_oleh = v('tindak_lanjut_oleh');
+            if (t_oleh === 'Tim' || t_oleh === 'Petugas Lainnya') t_oleh += ` (${v('tindak_lanjut_detail')})`;
+            document.getElementById('pr_tindak_lanjut_oleh').innerText = t_oleh;
+            
+            let p_terjadi = v('pernah_terjadi');
+            if (p_terjadi === 'Ya') p_terjadi += `\n(Tindakan Pencegahan: ${v('tindakan_pencegahan')})`;
+            document.getElementById('pr_pernah_terjadi').innerText = p_terjadi;
+
+            // INVESTIGASI
+            document.getElementById('pr_inv_1_tipe').innerText = v('inv_tipe_insiden');
+            document.getElementById('pr_inv_1_subtipe').innerText = v('inv_subtipe_insiden');
+            document.getElementById('pr_inv_2_harm').innerText = v('inv_tipe_harm');
+            document.getElementById('pr_inv_2_causa').innerText = v('inv_causa');
+            document.getElementById('pr_inv_3a').innerText = v('inv_masalah_cmp');
+            document.getElementById('pr_inv_3b').innerText = v('inv_masalah_sdp');
+            document.getElementById('pr_inv_4a').innerText = v('inv_penyebab_langsung');
+            document.getElementById('pr_inv_4b').innerText = v('inv_akar_masalah');
+            document.getElementById('pr_inv_5').innerText = v('inv_orang_terlibat');
+            document.getElementById('pr_inv_6').innerText = v('inv_proses_fase');
+            
+            // Faktor Kontributor (List)
+            const flist = document.getElementById('pr_inv_7_list');
+            flist.innerHTML = '';
+            for(let i=1; i<=4; i++) {
+                let val = document.getElementById(`inv_faktor_${i}`).value;
+                if(val) {
+                    let li = document.createElement('li');
+                    li.innerText = val;
+                    flist.appendChild(li);
+                }
+            }
+
+            document.getElementById('pr_inv_8a').innerText = v('inv_mitigasi_pasien');
+            document.getElementById('pr_inv_8b').innerText = v('inv_mitigasi_petugas');
+            document.getElementById('pr_inv_8c').innerText = v('inv_mitigasi_fasyankes');
+            document.getElementById('pr_inv_8d').innerText = v('inv_mitigasi_faktor');
+            
+            document.getElementById('pr_inv_9').innerText = v('inv_cara_deteksi');
+            document.getElementById('pr_inv_10').innerText = v('inv_dampak_fasyankes');
+            document.getElementById('pr_inv_11').innerText = v('inv_rekomendasi_akhir');
+            document.getElementById('pr_inv_12').innerText = v('inv_tindakan_akan');
+            
+            document.getElementById('pr_inv_13a').innerText = v('inv_perbaikan_pasien');
+            document.getElementById('pr_inv_13b').innerText = v('inv_perbaikan_fasyankes');
+            
+            document.getElementById('pr_inv_14a').innerText = v('inv_kurangi_pasien');
+            document.getElementById('pr_inv_14b').innerText = v('inv_kurangi_petugas');
+            document.getElementById('pr_inv_14c').innerText = v('inv_kurangi_fasyankes');
+            document.getElementById('pr_inv_14d').innerText = v('inv_kurangi_faktor');
+
+            // Show Print, Hide App
+            showMessage("Menyiapkan dokumen PDF... Mohon tunggu sebentar.", "info");
+            
+            document.getElementById('appContainer').style.display = 'none';
+            document.getElementById('printViewContainer').style.display = 'block';
+
+            // Menggunakan html2pdf.js untuk mengunduh PDF secara langsung (Bypass pemblokiran iframe)
+            const element = document.getElementById('printContent');
+            const opt = {
+                margin:       10,
+                filename:     `Laporan_IKP_${new Date().toISOString().slice(0,10)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            setTimeout(() => {
+                html2pdf().set(opt).from(element).save().then(() => {
+                    // Segera kembalikan tampilan setelah unduhan selesai
+                    document.getElementById('appContainer').style.display = 'block';
+                    document.getElementById('printViewContainer').style.display = 'none';
+
+                    // Tanyakan kepada user apakah form mau dikosongkan
+                    setTimeout(() => {
+                        showCustomModal({
+                            type: 'confirm',
+                            title: 'Unduhan PDF Selesai',
+                            body: 'File PDF berhasil diunduh ke perangkat Anda. Apakah Anda ingin mengosongkan seluruh form untuk pelaporan baru sekarang?',
+                            confirmText: 'Ya, Kosongkan Form',
+                            confirmColor: 'bg-red-600 hover:bg-red-700',
+                            onConfirm: () => {
+                                clearFormSilently();
+                                showMessage("Form telah berhasil dikosongkan.", "success");
+                            }
+                        });
+                    }, 500);
+                }).catch(err => {
+                    console.error(err);
+                    document.getElementById('appContainer').style.display = 'block';
+                    document.getElementById('printViewContainer').style.display = 'none';
+                    showMessage("Gagal membuat PDF.", "error");
+                });
+            }, 500);
+        }
+
+        // --- CUSTOM MESSAGE BOX ---
+        function showMessage(msg, type='info') {
+            const box = document.createElement('div');
+            box.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white font-bold text-sm shadow-lg z-50 transition-all transform translate-y-10 opacity-0 flex items-center`;
+            
+            if(type === 'error') box.classList.add('bg-red-600');
+            else if(type === 'success') box.classList.add('bg-green-600');
+            else if(type === 'warning') box.classList.add('bg-yellow-600');
+            else box.classList.add('bg-blue-600');
+            
+            box.innerText = msg;
+            document.body.appendChild(box);
+            
+            setTimeout(() => {
+                box.classList.remove('translate-y-10', 'opacity-0');
+            }, 10);
+            
+            setTimeout(() => {
+                box.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => box.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
