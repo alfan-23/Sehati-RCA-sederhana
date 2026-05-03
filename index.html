@@ -8,7 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Tambahan library untuk mengunduh PDF secara langsung (Bypass blokir iframe) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
@@ -185,7 +184,6 @@
                             <input type="text" id="insiden" placeholder="Sebutkan secara ringkas insiden yang terjadi..." class="w-full border border-gray-300 rounded-lg p-2.5 outline-none text-sm bg-white auto-save">
                         </div>
 
-                        <!-- 3. KRONOLOGIS -->
                         <div class="md:col-span-2 space-y-3">
                             <div class="flex justify-between items-end mb-1">
                                 <label class="text-xs font-bold text-gray-500 uppercase block">3. Kronologis Insiden (Catatan Mentah)</label>
@@ -239,7 +237,6 @@
                             </div>
                         </div>
 
-                        <!-- TOMBOL AI SARAN GRADING -->
                         <div class="md:col-span-2 flex flex-col md:flex-row justify-between items-start md:items-center border-t border-gray-100 pt-6 mt-4 gap-4">
                             <div>
                                 <h3 class="text-sm font-bold text-gray-800 uppercase">Penilaian & Grading Risiko</h3>
@@ -251,7 +248,6 @@
                             </button>
                         </div>
 
-                        <!-- KOLOM HASIL SARAN AI -->
                         <div id="ai_suggestion_box" class="md:col-span-2 hidden bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 relative animate-fade-in shadow-inner">
                             <button type="button" onclick="document.getElementById('ai_suggestion_box').classList.add('hidden')" class="absolute top-4 right-4 text-indigo-400 hover:text-indigo-700 bg-white rounded-full p-1 shadow-sm">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -759,7 +755,6 @@
         </div>
     </div>
 
-    <!-- WADAH KHUSUS CETAK PDF -->
     <div id="printViewContainer" class="hidden">
         <div id="printContent" class="print-content bg-white w-[210mm] min-h-[297mm] mx-auto p-10 text-black">
             <h1 class="text-center font-bold text-xl mb-1 uppercase">LAPORAN INSIDEN KESELAMATAN PASIEN (IKP)</h1>
@@ -889,7 +884,6 @@
         </div>
     </div>
 
-    <!-- MODAL CUSTOM UNTUK MENGGANTIKAN ALERT/PROMPT/CONFIRM BAWAAN -->
     <div id="customModal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50 px-4">
         <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full transform transition-all scale-95 opacity-0 duration-200" id="customModalContent">
             <h3 class="font-bold text-lg mb-2 text-gray-800" id="customModalTitle">Judul Modal</h3>
@@ -898,20 +892,83 @@
             <input type="password" id="customModalInput" class="w-full border border-gray-300 p-3 rounded-xl mb-5 text-sm hidden outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" placeholder="...">
             
             <div class="flex justify-end gap-3" id="customModalActions">
-                <!-- Tombol dinamis -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- JAVASCRIPT LOGIC -->
     <script>
-        const apiKey = ""; 
+        let apiKey = ""; 
+        let apiModel = "gemini-2.5-flash";
         let autoSaveTimer = null;
+        let isWaitingForRetry = null;
+        let lastFailedAction = null;
+
+        // --- SISTEM PARAMETER URL & DASHBOARD INTEGRATION ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const keyFromUrl = urlParams.get('key');
+        const modelFromUrl = urlParams.get('model');
+        
+        if (keyFromUrl) apiKey = keyFromUrl;
+        if (modelFromUrl) apiModel = modelFromUrl;
+        
+        if (keyFromUrl || modelFromUrl) {
+            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+        }
+
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'UPDATE_CONFIG') {
+                apiKey = event.data.key;
+                if (event.data.model) apiModel = event.data.model;
+                console.log(`[IKP App] Konfigurasi Diperbarui. Model: ${apiModel}`);
+                
+                if (isWaitingForRetry) {
+                    showMessage(`🔄 Melanjutkan dengan model ${apiModel}...`, "info");
+                    const retryFunc = isWaitingForRetry;
+                    isWaitingForRetry = null;
+                    setTimeout(() => retryFunc(), 1000);
+                }
+            }
+            
+            if (event.data && event.data.type === 'STOP_RETRY') {
+                isWaitingForRetry = null;
+                showMessage("❌ Siklus Terhenti: Seluruh API Key dan Model gagal memproses.", "error");
+                
+                // Kembalikan tombol-tombol AI yang sedang disabled/loading
+                document.querySelectorAll('button:disabled').forEach(b => {
+                    b.disabled = false;
+                    if(b.innerHTML.includes('MEMPROSES AI...')) { 
+                        b.innerHTML = `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> ✨ AI BUAT NARASI BAKU`;
+                    } else if(b.innerHTML.includes('SARAN AI UNTUK GRADING')) { 
+                        b.innerHTML = `<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> ✨ SARAN AI UNTUK GRADING`;
+                    } else if (b.innerHTML.includes('Proses...')) {
+                        b.innerHTML = `✨ AI`; 
+                    }
+                });
+                
+                setTimeout(() => {
+                    showCustomModal({
+                        type: 'confirm',
+                        title: 'Siklus Dihentikan',
+                        body: 'Sistem telah mencoba semua Slot API Key dan Model AI secara otomatis, namun semuanya kehabisan kuota atau gagal.\n\nApakah Anda ingin mencoba memproses ulang dari awal?',
+                        confirmText: 'Coba Lagi',
+                        confirmColor: 'bg-blue-600 hover:bg-blue-700',
+                        onConfirm: () => {
+                            if (lastFailedAction) lastFailedAction();
+                        }
+                    });
+                }, 500);
+            }
+        });
 
         window.onload = () => {
             setupAutoSave();
             loadDraftFromLocalStorage();
             calculateGrading();
+
+            if (!apiKey && window.parent !== window) {
+                window.parent.postMessage({ type: 'REQUEST_CONFIG' }, '*');
+            }
         };
 
         // --- SISTEM MODAL CUSTOM (Anti-Blokir iframe) ---
@@ -1118,9 +1175,14 @@
             triggerAutoSave();
         }
 
-        // --- GEMINI AI LOGIC ---
+        // --- GEMINI AI LOGIC (WITH AUTO-RETRY DASHBOARD INTEGRATION) ---
         async function fetchGeminiWithBackoff(prompt, maxRetries = 5) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            if (!apiKey) {
+                showMessage("API Key belum dikonfigurasi dari Dashboard.", "error");
+                throw new Error("API Key kosong");
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
                 systemInstruction: { parts: [{ text: "Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta." }] }
@@ -1137,15 +1199,29 @@
                         body: JSON.stringify(payload)
                     });
                     
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    if (!response.ok) {
+                        if (response.status === 429 || response.status === 404 || response.status === 403 || response.status >= 500) {
+                             if (window.parent !== window) {
+                                  window.parent.postMessage({ type: 'API_ERROR', code: response.status }, '*');
+                             }
+                             throw new Error("API_FAIL_ROTATE");
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                     
                     const data = await response.json();
+                    
+                    if (window.parent !== window) {
+                        window.parent.postMessage({ type: 'API_SUCCESS' }, '*');
+                    }
+                    
                     if (data.candidates && data.candidates[0].content.parts[0].text) {
                         return data.candidates[0].content.parts[0].text;
                     } else {
                         throw new Error("Format respons API tidak sesuai");
                     }
                 } catch (error) {
+                    if (error.message === "API_FAIL_ROTATE") throw error;
                     retries++;
                     if (retries >= maxRetries) throw error;
                     await new Promise(resolve => setTimeout(resolve, delays[retries-1]));
@@ -1178,13 +1254,22 @@
                 const resultText = await fetchGeminiWithBackoff(prompt);
                 textarea.value = resultText.trim();
                 triggerAutoSave();
-            } catch (error) {
-                textarea.value = "Gagal menghubungi AI. \n\nGabungan Manual:\n" + rawText;
-                showMessage("Gagal menggunakan AI. Pastikan layanan tidak terganggu.", "error");
-            } finally {
+                
                 btn.innerHTML = originalHTML;
                 btn.disabled = false;
                 textarea.classList.remove('bg-ai-gradient');
+            } catch (error) {
+                if (error.message === "API_FAIL_ROTATE") {
+                    textarea.value = "Menunggu rotasi API/Model otomatis dari Dashboard...";
+                    isWaitingForRetry = () => generateNarasi();
+                    lastFailedAction = () => generateNarasi();
+                } else {
+                    textarea.value = "Gagal menghubungi AI. \n\nGabungan Manual:\n" + rawText;
+                    showMessage("Gagal menggunakan AI. Pastikan layanan tidak terganggu.", "error");
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                    textarea.classList.remove('bg-ai-gradient');
+                }
             }
         }
 
@@ -1215,12 +1300,20 @@
                 const resultText = await fetchGeminiWithBackoff(prompt);
                 content.innerText = resultText.trim();
                 showMessage("Saran Grading AI berhasil dimuat.", "success");
-            } catch (error) {
-                content.innerText = "Gagal memuat saran AI. Pastikan koneksi internet lancar.";
-                showMessage("Gagal menganalisis grading.", "error");
-            } finally {
+                
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
+            } catch (error) {
+                if (error.message === "API_FAIL_ROTATE") {
+                    content.innerText = "Menunggu rotasi API/Model otomatis dari Dashboard...";
+                    isWaitingForRetry = () => generateAIGrading();
+                    lastFailedAction = () => generateAIGrading();
+                } else {
+                    content.innerText = "Gagal memuat saran AI. Pastikan koneksi internet lancar.";
+                    showMessage("Gagal menganalisis grading.", "error");
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
             }
         }
 
@@ -1376,12 +1469,20 @@
 
                 triggerAutoSave();
                 showMessage("Saran AI berhasil dimuat", "success");
-            } catch (error) {
-                console.error("AI Error:", error);
-                showMessage("Gagal menganalisis. Cek koneksi Anda.", "error");
-            } finally {
+                
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
+            } catch (error) {
+                if (error.message === "API_FAIL_ROTATE") {
+                    showMessage("Menunggu rotasi API/Model otomatis...", "info");
+                    isWaitingForRetry = () => generateAIInvestigasi(type);
+                    lastFailedAction = () => generateAIInvestigasi(type);
+                } else {
+                    console.error("AI Error:", error);
+                    showMessage("Gagal menganalisis. Cek koneksi Anda.", "error");
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }
             }
         }
 
