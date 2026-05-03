@@ -1175,7 +1175,7 @@
             triggerAutoSave();
         }
 
-        // --- GEMINI AI LOGIC (WITH AUTO-RETRY DASHBOARD INTEGRATION) ---
+        // --- GEMINI AI LOGIC (WITH AUTO-RETRY DASHBOARD INTEGRATION & SAFETY BYPASS) ---
         async function fetchGeminiWithBackoff(prompt, maxRetries = 5) {
             if (!apiKey) {
                 showMessage("API Key belum dikonfigurasi dari Dashboard.", "error");
@@ -1185,6 +1185,13 @@
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
+                // MATIKAN Filter Keamanan agar tidak sensitif dengan teks cedera medis (KTD/Sentinel)
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                ],
                 systemInstruction: { parts: [{ text: "Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta." }] }
             };
 
@@ -1215,13 +1222,16 @@
                         window.parent.postMessage({ type: 'API_SUCCESS' }, '*');
                     }
                     
-                    if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    // Gunakan Optional Chaining (?.) untuk mencegah crash jika AI masih memblokir respon
+                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
                         return data.candidates[0].content.parts[0].text;
+                    } else if (data.candidates?.[0]?.finishReason === 'SAFETY') {
+                        throw new Error("SAFETY_BLOCK");
                     } else {
                         throw new Error("Format respons API tidak sesuai");
                     }
                 } catch (error) {
-                    if (error.message === "API_FAIL_ROTATE") throw error;
+                    if (error.message === "API_FAIL_ROTATE" || error.message === "SAFETY_BLOCK") throw error;
                     retries++;
                     if (retries >= maxRetries) throw error;
                     await new Promise(resolve => setTimeout(resolve, delays[retries-1]));
@@ -1263,6 +1273,12 @@
                     textarea.value = "Menunggu rotasi API/Model otomatis dari Dashboard...";
                     isWaitingForRetry = () => generateNarasi();
                     lastFailedAction = () => generateNarasi();
+                } else if (error.message === "SAFETY_BLOCK") {
+                    textarea.value = "Narasi diblokir Google AI karena terdeteksi sebagai konten berbahaya. Mohon edit kronologis agar tidak terlalu eksplisit.";
+                    showMessage("Ditolak oleh Filter Keamanan AI.", "error");
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                    textarea.classList.remove('bg-ai-gradient');
                 } else {
                     textarea.value = "Gagal menghubungi AI. \n\nGabungan Manual:\n" + rawText;
                     showMessage("Gagal menggunakan AI. Pastikan layanan tidak terganggu.", "error");
@@ -1308,6 +1324,11 @@
                     content.innerText = "Menunggu rotasi API/Model otomatis dari Dashboard...";
                     isWaitingForRetry = () => generateAIGrading();
                     lastFailedAction = () => generateAIGrading();
+                } else if (error.message === "SAFETY_BLOCK") {
+                    content.innerText = "Saran diblokir oleh sistem keamanan AI Google (terdeteksi konten berbahaya/luka eksplisit).";
+                    showMessage("Ditolak oleh Filter Keamanan AI.", "error");
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
                 } else {
                     content.innerText = "Gagal memuat saran AI. Pastikan koneksi internet lancar.";
                     showMessage("Gagal menganalisis grading.", "error");
@@ -1477,6 +1498,10 @@
                     showMessage("Menunggu rotasi API/Model otomatis...", "info");
                     isWaitingForRetry = () => generateAIInvestigasi(type);
                     lastFailedAction = () => generateAIInvestigasi(type);
+                } else if (error.message === "SAFETY_BLOCK") {
+                    showMessage("Analisis diblokir Filter Keamanan Google AI (konten terlalu eksplisit).", "error");
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
                 } else {
                     console.error("AI Error:", error);
                     showMessage("Gagal menganalisis. Cek koneksi Anda.", "error");
