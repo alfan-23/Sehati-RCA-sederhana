@@ -23,18 +23,19 @@
         .print-sub-table td { border: none; border-bottom: 1px solid #eee; padding: 4px 0; }
         .print-sub-table tr:last-child td { border-bottom: none; }
         
-        /* CSS KHUSUS PRINT-TO-PDF NATIVE (TEXT BASED) */
+        /* MODIFIKASI: CSS KHUSUS PRINT-TO-PDF NATIVE (TEXT BASED) */
         @media print {
-            body { background-color: white; margin: 0; padding: 0; }
+            @page { margin: 1.5cm; size: A4 portrait; }
+            body { background-color: white !important; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             #appContainer, .no-print, #customModal, #custom-toast { display: none !important; }
             #printViewContainer { display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
             .print-content { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; border: none !important; box-shadow: none !important; }
             
-            .print-table { width: 100% !important; page-break-inside: auto; margin-bottom: 20px; }
+            .print-table { width: 100% !important; page-break-inside: auto; margin-bottom: 20px; table-layout: fixed; }
             .print-table tr { page-break-inside: avoid; page-break-after: auto; }
-            .print-table th, .print-table td { border: 1px solid #000 !important; word-break: break-word; }
-            
-            @page { margin: 1.5cm; size: A4 portrait; }
+            .print-table th, .print-table td { border: 0.5pt solid #000 !important; word-break: break-word; overflow-wrap: break-word; }
+            .print-table th { background-color: #f3f4f6 !important; }
+            .whitespace-pre-wrap { white-space: pre-wrap !important; font-family: Arial, sans-serif !important; }
         }
         
         @keyframes pulse-save { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
@@ -55,7 +56,7 @@
         .grade-kuning { background-color: #eab308; color: white; }
         .grade-merah { background-color: #ef4444; color: white; }
 
-        .inv-input { w-full; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem; outline: none; font-size: 0.875rem; background-color: white; }
+        .inv-input { width: 100%; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem; outline: none; font-size: 0.875rem; background-color: white; }
         .inv-input:focus { border-color: #0d9488; box-shadow: 0 0 0 1px #0d9488; }
         .inv-label { font-size: 0.75rem; font-weight: 700; color: #374151; margin-bottom: 0.25rem; display: block; }
     </style>
@@ -888,11 +889,8 @@
         <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full transform transition-all scale-95 opacity-0 duration-200" id="customModalContent">
             <h3 class="font-bold text-lg mb-2 text-gray-800" id="customModalTitle">Judul Modal</h3>
             <p class="text-sm text-gray-600 mb-5 leading-relaxed" id="customModalBody">Pesan modal disini.</p>
-            
             <input type="password" id="customModalInput" class="w-full border border-gray-300 p-3 rounded-xl mb-5 text-sm hidden outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500" placeholder="...">
-            
-            <div class="flex justify-end gap-3" id="customModalActions">
-                </div>
+            <div class="flex justify-end gap-3" id="customModalActions"></div>
         </div>
     </div>
 
@@ -903,7 +901,6 @@
         let isWaitingForRetry = null;
         let lastFailedAction = null;
 
-        // --- SISTEM PARAMETER URL & DASHBOARD INTEGRATION ---
         const urlParams = new URLSearchParams(window.location.search);
         const keyFromUrl = urlParams.get('key');
         const modelFromUrl = urlParams.get('model');
@@ -921,7 +918,6 @@
                 apiKey = event.data.key;
                 if (event.data.model) apiModel = event.data.model;
                 console.log(`[IKP App] Konfigurasi Diperbarui. Model: ${apiModel}`);
-                
                 if (isWaitingForRetry) {
                     showMessage(`🔄 Melanjutkan dengan model ${apiModel}...`, "info");
                     const retryFunc = isWaitingForRetry;
@@ -929,19 +925,13 @@
                     setTimeout(() => retryFunc(), 1000);
                 }
             }
-            
             if (event.data && event.data.type === 'STOP_RETRY') {
                 isWaitingForRetry = null;
                 showMessage("❌ Siklus Terhenti: Seluruh API Key dan Model gagal memproses.", "error");
-                
-                // Kembalikan tombol-tombol AI yang sedang disabled/loading menggunakan dataset
                 document.querySelectorAll('button:disabled').forEach(b => {
                     b.disabled = false;
-                    if (b.dataset.originalHtml) {
-                        b.innerHTML = b.dataset.originalHtml;
-                    }
+                    if (b.dataset.originalHtml) b.innerHTML = b.dataset.originalHtml;
                 });
-                
                 setTimeout(() => {
                     showCustomModal({
                         type: 'confirm',
@@ -949,9 +939,7 @@
                         body: 'Sistem telah mencoba semua Slot API Key dan Model AI secara otomatis, namun semuanya kehabisan kuota atau gagal.\n\nApakah Anda ingin mencoba memproses ulang dari awal?',
                         confirmText: 'Coba Lagi',
                         confirmColor: 'bg-blue-600 hover:bg-blue-700',
-                        onConfirm: () => {
-                            if (lastFailedAction) lastFailedAction();
-                        }
+                        onConfirm: () => { if (lastFailedAction) lastFailedAction(); }
                     });
                 }, 500);
             }
@@ -961,22 +949,18 @@
             setupAutoSave();
             loadDraftFromLocalStorage();
             calculateGrading();
-
             if (!apiKey && window.parent !== window) {
                 window.parent.postMessage({ type: 'REQUEST_CONFIG' }, '*');
             }
         };
 
-        // --- SISTEM MODAL CUSTOM (Anti-Blokir iframe) ---
         function showCustomModal(options) {
             const modal = document.getElementById('customModal');
             const content = document.getElementById('customModalContent');
             const input = document.getElementById('customModalInput');
             const actionsDiv = document.getElementById('customModalActions');
-            
             document.getElementById('customModalTitle').innerText = options.title || 'Informasi';
             document.getElementById('customModalBody').innerText = options.body || '';
-            
             if (options.type === 'prompt') {
                 input.style.display = 'block';
                 input.value = '';
@@ -985,9 +969,7 @@
             } else {
                 input.style.display = 'none';
             }
-            
             actionsDiv.innerHTML = '';
-            
             if (options.type !== 'alert') {
                 const btnCancel = document.createElement('button');
                 btnCancel.className = 'px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors';
@@ -998,7 +980,6 @@
                 };
                 actionsDiv.appendChild(btnCancel);
             }
-            
             const btnConfirm = document.createElement('button');
             btnConfirm.className = `px-5 py-2.5 text-white rounded-xl text-sm font-bold transition-colors ${options.confirmColor || 'bg-teal-600 hover:bg-teal-700'}`;
             btnConfirm.innerText = options.confirmText || 'OK';
@@ -1008,29 +989,22 @@
                 if(options.onConfirm) options.onConfirm(val); 
             };
             actionsDiv.appendChild(btnConfirm);
-            
             modal.style.display = 'flex';
-            setTimeout(() => {
-                content.classList.remove('scale-95', 'opacity-0');
-            }, 10);
+            setTimeout(() => { content.classList.remove('scale-95', 'opacity-0'); }, 10);
         }
 
         function closeCustomModal() {
             const modal = document.getElementById('customModal');
             const content = document.getElementById('customModalContent');
             content.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                modal.style.display = 'none';
-            }, 200);
+            setTimeout(() => { modal.style.display = 'none'; }, 200);
         }
 
-        // --- TAB NAVIGATION ---
         function switchTab(tab) {
             const btnLaporan = document.getElementById('btnTabLaporan');
             const btnInvestigasi = document.getElementById('btnTabInvestigasi');
             const conLaporan = document.getElementById('tabLaporanContainer');
             const conInvestigasi = document.getElementById('tabInvestigasiContainer');
-
             if (tab === 'laporan') {
                 btnLaporan.className = "flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-active uppercase transition-all";
                 btnInvestigasi.className = "flex-1 py-3 px-4 font-bold text-sm tracking-wide tab-inactive uppercase transition-all";
@@ -1044,7 +1018,6 @@
             }
         }
 
-        // --- UTILS (UI Branching) ---
         function toggleLainnya(selectEl, targetDivId, targetInputId) {
             const div = document.getElementById(targetDivId);
             if (selectEl.value === 'Lain-lain') {
@@ -1060,14 +1033,11 @@
             const val = document.getElementById('pelapor_pertama').value;
             const nakesDiv = document.getElementById('pelapor_nakes_div');
             const lainDiv = document.getElementById('pelapor_lain_div');
-            
             nakesDiv.style.display = val === 'Tenaga Kesehatan' ? 'block' : 'none';
             lainDiv.style.display = val === 'Lain-lain' ? 'block' : 'none';
-            
             if(val !== 'Tenaga Kesehatan') document.getElementById('pelapor_nakes').value = '';
             if(val !== 'Lain-lain') {
                 document.getElementById('pelapor_lain').value = '';
-                if (val !== 'Tenaga Kesehatan') document.getElementById('pelapor_lain').value = '';
             }
             triggerAutoSave();
         }
@@ -1108,18 +1078,12 @@
             triggerAutoSave();
         }
 
-        // --- GRADING MATRIX LOGIC ---
         function updateDampakInsiden() {
             const jenis = document.getElementById('jenis_insiden').value;
             const dampak = document.getElementById('dampak_insiden');
-            
-            if (jenis.includes('Sentinel')) {
-                dampak.value = "5";
-            } else if (jenis.includes('KTD')) {
-                if (parseInt(dampak.value) < 2 || parseInt(dampak.value) > 4) dampak.value = "3";
-            } else if (jenis.includes('KTC') || jenis.includes('KNC') || jenis.includes('KPC')) {
-                dampak.value = "1";
-            }
+            if (jenis.includes('Sentinel')) dampak.value = "5";
+            else if (jenis.includes('KTD')) { if (parseInt(dampak.value) < 2 || parseInt(dampak.value) > 4) dampak.value = "3"; }
+            else if (jenis.includes('KTC') || jenis.includes('KNC') || jenis.includes('KPC')) dampak.value = "1";
             calculateGrading();
             triggerAutoSave();
         }
@@ -1129,409 +1093,178 @@
             const pVal = parseInt(document.getElementById('probabilitas').value) || 0;
             const resultDiv = document.getElementById('grading_result');
             const hiddenVal = document.getElementById('grading_value');
-            
             if (dVal === 0 || pVal === 0) {
                 resultDiv.className = "w-full border border-gray-300 rounded-lg p-3 text-center text-sm font-bold bg-gray-100 text-gray-500 flex items-center justify-center h-[46px]";
                 resultDiv.innerText = "Pilih Dampak dan Probabilitas";
                 hiddenVal.value = "";
                 return;
             }
-
             let skor = dVal * pVal;
-            let warna = "";
-            let label = "";
-
+            let warna = ""; let label = "";
             if (dVal === 1) {
                 if (pVal <= 2) { warna = "grade-biru"; label = "BIRU (Rendah)"; }
                 else if (pVal <= 4) { warna = "grade-hijau"; label = "HIJAU (Sedang)"; }
                 else { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
-            } 
-            else if (dVal === 2) {
+            } else if (dVal === 2) {
                 if (pVal === 1) { warna = "grade-biru"; label = "BIRU (Rendah)"; }
                 else if (pVal <= 3) { warna = "grade-hijau"; label = "HIJAU (Sedang)"; }
                 else if (pVal === 4) { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
                 else { warna = "grade-merah"; label = "MERAH (Ekstrem)"; }
-            }
-            else if (dVal === 3) {
+            } else if (dVal === 3) {
                 if (pVal === 1) { warna = "grade-hijau"; label = "HIJAU (Sedang)"; }
                 else if (pVal <= 3) { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
                 else { warna = "grade-merah"; label = "MERAH (Ekstrem)"; }
-            }
-            else if (dVal === 4) {
+            } else if (dVal === 4) {
                 if (pVal === 1) { warna = "grade-kuning"; label = "KUNING (Tinggi)"; }
                 else { warna = "grade-merah"; label = "MERAH (Ekstrem)"; }
-            }
-            else if (dVal === 5) {
-                warna = "grade-merah"; label = "MERAH (Ekstrem)"; 
-            }
-
+            } else if (dVal === 5) { warna = "grade-merah"; label = "MERAH (Ekstrem)"; }
             resultDiv.className = `w-full border rounded-lg p-3 text-center text-sm font-bold transition-colors flex items-center justify-center h-[46px] ${warna}`;
             resultDiv.innerText = `Skor: ${skor} - ${label}`;
             hiddenVal.value = label;
             triggerAutoSave();
         }
 
-        // --- GEMINI AI LOGIC (WITH AUTO-RETRY DASHBOARD INTEGRATION & SAFETY BYPASS) ---
         async function fetchGeminiWithBackoff(prompt, maxRetries = 5) {
-            if (!apiKey) {
-                showMessage("API Key belum dikonfigurasi dari Dashboard.", "error");
-                throw new Error("API Key kosong");
-            }
-
+            if (!apiKey) { showMessage("API Key belum dikonfigurasi dari Dashboard.", "error"); throw new Error("API Key kosong"); }
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
-            const payload = {
-                contents: [{ parts: [{ text: "Instruksi Sistem: Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta.\n\n" + prompt }] }]
-            };
-
-            let retries = 0;
-            const delays = [1000, 2000, 4000, 8000, 16000];
-
+            const payload = { contents: [{ parts: [{ text: "Instruksi Sistem: Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta.\n\n" + prompt }] }] };
+            let retries = 0; const delays = [1000, 2000, 4000, 8000, 16000];
             while (retries < maxRetries) {
                 try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    
+                    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                     if (!response.ok) {
                         if (response.status === 429 || response.status === 404 || response.status === 403 || response.status >= 500) {
-                             if (window.parent !== window) {
-                                  window.parent.postMessage({ type: 'API_ERROR', code: response.status }, '*');
-                             }
+                             if (window.parent !== window) window.parent.postMessage({ type: 'API_ERROR', code: response.status }, '*');
                              throw new Error("API_FAIL_ROTATE");
-                        }
-                        if (response.status === 400) {
-                             const errData = await response.json().catch(()=>({}));
-                             throw new Error(`BAD_REQUEST: ${errData.error?.message || "Format Payload Ditolak"}`);
                         }
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    
                     const data = await response.json();
-                    
-                    if (window.parent !== window) {
-                        window.parent.postMessage({ type: 'API_SUCCESS' }, '*');
-                    }
-                    
-                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                        return data.candidates[0].content.parts[0].text;
-                    } else if (data.candidates?.[0]?.finishReason === 'SAFETY') {
-                        throw new Error("SAFETY_BLOCK");
-                    } else {
-                        throw new Error("Format respons API tidak sesuai");
-                    }
+                    if (window.parent !== window) window.parent.postMessage({ type: 'API_SUCCESS' }, '*');
+                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) return data.candidates[0].content.parts[0].text;
+                    else if (data.candidates?.[0]?.finishReason === 'SAFETY') throw new Error("SAFETY_BLOCK");
+                    else throw new Error("Format respons API tidak sesuai");
                 } catch (error) {
-                    if (error.message === "API_FAIL_ROTATE" || error.message === "SAFETY_BLOCK" || error.message.includes("BAD_REQUEST")) throw error;
-                    retries++;
-                    if (retries >= maxRetries) throw error;
+                    if (error.message === "API_FAIL_ROTATE" || error.message === "SAFETY_BLOCK") throw error;
+                    retries++; if (retries >= maxRetries) throw error;
                     await new Promise(resolve => setTimeout(resolve, delays[retries-1]));
                 }
             }
         }
 
-        // AI Fungsi 1: Narasi
         async function generateNarasi(btnElement) {
             const rawText = document.getElementById('kronologis_insiden').value.trim();
-            if (!rawText) {
-                showMessage('Isi kronologis insiden terlebih dahulu!', 'error');
-                return;
-            }
-
+            if (!rawText) { showMessage('Isi kronologis insiden terlebih dahulu!', 'error'); return; }
             const container = document.getElementById('narasi_result_container');
             const textarea = document.getElementById('final_narasi');
             const btn = btnElement || document.getElementById('btnNarasi');
-            
-            let originalHTML = btn.dataset.originalHtml;
-            if (!originalHTML) {
-                originalHTML = btn.innerHTML;
-                btn.dataset.originalHtml = originalHTML;
-            }
-            
+            let originalHTML = btn.dataset.originalHtml || btn.innerHTML;
+            btn.dataset.originalHtml = originalHTML;
             btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> MEMPROSES AI...`;
             btn.disabled = true;
             container.classList.remove('hidden');
-            textarea.value = "Mengumpulkan informasi dan menyusun narasi medis...";
-            textarea.classList.add('bg-ai-gradient');
-
-            const prompt = `Susunlah sebuah narasi medis baku untuk laporan Insiden Keselamatan Pasien (IKP) berdasarkan catatan kronologis berikut:\n\n${rawText}\n\nATURAN WAJIB:\n1. Gabungkan menjadi 1 paragraf narasi yang mengalir, profesional, dan objektif.\n2. Tuliskan HANYA narasinya saja secara LANGSUNG (tidak ada basa-basi).\n3. JANGAN berikan beberapa opsi/pilihan narasi.`;
-
+            textarea.value = "Mengumpulkan informasi..."; textarea.classList.add('bg-ai-gradient');
+            const prompt = `Susunlah sebuah narasi medis baku untuk laporan IKP berdasarkan catatan kronologis berikut:\n\n${rawText}\n\nATURAN WAJIB:\n1. Gabungkan menjadi 1 paragraf narasi yang mengalir.\n2. Tuliskan HANYA narasinya saja secara LANGSUNG.`;
             try {
                 const resultText = await fetchGeminiWithBackoff(prompt);
-                textarea.value = resultText.trim();
-                triggerAutoSave();
-                
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-                textarea.classList.remove('bg-ai-gradient');
+                textarea.value = resultText.trim(); triggerAutoSave();
+                btn.innerHTML = originalHTML; btn.disabled = false; textarea.classList.remove('bg-ai-gradient');
             } catch (error) {
-                if (error.message === "API_FAIL_ROTATE") {
-                    textarea.value = "Menunggu rotasi API/Model otomatis dari Dashboard...";
-                    isWaitingForRetry = () => generateNarasi(btn);
-                    lastFailedAction = () => generateNarasi(btn);
-                } else if (error.message === "SAFETY_BLOCK") {
-                    textarea.value = "Narasi diblokir Google AI karena terdeteksi sebagai konten berbahaya. Mohon edit kronologis agar tidak terlalu eksplisit.";
-                    showMessage("Ditolak oleh Filter Keamanan AI.", "error");
-                    btn.innerHTML = originalHTML;
-                    btn.disabled = false;
-                    textarea.classList.remove('bg-ai-gradient');
-                } else {
-                    textarea.value = "Gagal menghubungi AI. \n\nGabungan Manual:\n" + rawText;
-                    showMessage("Gagal menggunakan AI. Pastikan layanan tidak terganggu.", "error");
-                    btn.innerHTML = originalHTML;
-                    btn.disabled = false;
-                    textarea.classList.remove('bg-ai-gradient');
-                }
+                if (error.message === "API_FAIL_ROTATE") { textarea.value = "Menunggu rotasi API..."; isWaitingForRetry = () => generateNarasi(btn); lastFailedAction = () => generateNarasi(btn); }
+                else { textarea.value = "Gagal menghubungi AI.\n" + rawText; btn.innerHTML = originalHTML; btn.disabled = false; textarea.classList.remove('bg-ai-gradient'); }
             }
         }
 
-        // AI Fungsi 2: Saran Grading
         async function generateAIGrading() {
             const narasi = document.getElementById('final_narasi').value.trim() || document.getElementById('kronologis_insiden').value.trim();
             const namaInsiden = document.getElementById('insiden').value;
-            const pelayananAwal = document.getElementById('pelayanan_awal').value;
-
-            if (!narasi && !namaInsiden) {
-                showMessage("Lengkapi Nama Insiden dan Kronologis terlebih dahulu agar AI punya referensi analisis.", "warning");
-                return;
-            }
-
+            if (!narasi && !namaInsiden) { showMessage("Lengkapi Nama Insiden dan Kronologis terlebih dahulu.", "warning"); return; }
             const btn = document.getElementById('btnAIGrading');
-            let originalHtml = btn.dataset.originalHtml;
-            if (!originalHtml) {
-                originalHtml = btn.innerHTML;
-                btn.dataset.originalHtml = originalHtml;
-            }
-
-            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> MEMPROSES AI...`;
-            btn.disabled = true;
-
+            let originalHtml = btn.dataset.originalHtml || btn.innerHTML;
+            btn.dataset.originalHtml = originalHtml;
+            btn.innerHTML = `MEMPROSES AI...`; btn.disabled = true;
             const box = document.getElementById('ai_suggestion_box');
             const content = document.getElementById('ai_suggestion_content');
-            box.classList.remove('hidden');
-            content.innerHTML = `<span class="animate-pulse font-bold text-indigo-400">Sedang menganalisis matriks risiko berdasarkan kronologis kejadian...</span>`;
-
-            const prompt = `Berdasarkan data insiden berikut:\nNama Insiden: ${namaInsiden}\nPelayanan Tujuan Awal: ${pelayananAwal || '-'}\nKronologis: ${narasi}\n\nTugas Anda:\nBerikan rekomendasi penilaian untuk 3 parameter matriks risiko pelaporan IKP secara ringkas.\n1. Saran Jenis Insiden (Pilih satu: KTD, Kejadian Sentinel, KTC, KNC, KPC)\n2. Saran Dampak/Severity (Pilih satu: 1-Tidak Cedera, 2-Cedera Ringan, 3-Cedera Sedang, 4-Cedera Berat, 5-Kematian)\n3. Saran Probabilitas/Frekuensi (Pilih satu: 1-Sangat Jarang s/d 5-Sangat Sering)\n\nTuliskan dalam format poin-poin yang rapi.`;
-
+            box.classList.remove('hidden'); content.innerHTML = `Menganalisis...`;
+            const prompt = `Berdasarkan data insiden berikut:\nNama Insiden: ${namaInsiden}\nKronologis: ${narasi}\nBerikan rekomendasi: 1. Jenis Insiden, 2. Dampak, 3. Probabilitas.`;
             try {
                 const resultText = await fetchGeminiWithBackoff(prompt);
-                content.innerText = resultText.trim();
-                showMessage("Saran Grading AI berhasil dimuat.", "success");
-                
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
+                content.innerText = resultText.trim(); btn.innerHTML = originalHtml; btn.disabled = false;
             } catch (error) {
-                if (error.message === "API_FAIL_ROTATE") {
-                    content.innerText = "Menunggu rotasi API/Model otomatis dari Dashboard...";
-                    isWaitingForRetry = () => generateAIGrading();
-                    lastFailedAction = () => generateAIGrading();
-                } else if (error.message === "SAFETY_BLOCK") {
-                    content.innerText = "Saran diblokir oleh sistem keamanan AI Google (terdeteksi konten berbahaya/luka eksplisit).";
-                    showMessage("Ditolak oleh Filter Keamanan AI.", "error");
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
-                } else {
-                    content.innerText = "Gagal memuat saran AI. Pastikan koneksi internet lancar.";
-                    showMessage("Gagal menganalisis grading.", "error");
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
-                }
+                if (error.message === "API_FAIL_ROTATE") { isWaitingForRetry = () => generateAIGrading(); lastFailedAction = () => generateAIGrading(); }
+                else { content.innerText = "Gagal memuat saran AI."; btn.innerHTML = originalHtml; btn.disabled = false; }
             }
         }
 
-        // AI Fungsi 3: INVESTIGASI SEDERHANA HASIL ANALISA 14 POIN
         async function generateAIInvestigasi(type, btnElement) {
             const narasi = document.getElementById('final_narasi').value.trim() || document.getElementById('kronologis_insiden').value.trim();
             const namaInsiden = document.getElementById('insiden').value;
-
-            if (!narasi && !namaInsiden) {
-                showMessage("Lengkapi Nama Insiden dan Kronologis (Form 1) terlebih dahulu agar AI punya konteks.", "warning");
-                return;
-            }
-
-            let prompt = "";
-            let targetIds = [];
-            let btn = btnElement;
-            let originalHtml = btn.dataset.originalHtml;
-            if (!originalHtml) {
-                originalHtml = btn.innerHTML;
-                btn.dataset.originalHtml = originalHtml;
-            }
-
-            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-3 w-3 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Proses...`;
-            btn.disabled = true;
-
+            if (!narasi && !namaInsiden) { showMessage("Lengkapi Nama Insiden dan Kronologis (Form 1) terlebih dahulu.", "warning"); return; }
+            let prompt = ""; let targetIds = []; let btn = btnElement;
+            let originalHtml = btn.dataset.originalHtml || btn.innerHTML;
+            btn.dataset.originalHtml = originalHtml;
+            btn.innerHTML = `Proses...`; btn.disabled = true;
             const context = `Nama Insiden: ${namaInsiden}\nKronologis: ${narasi}\n`;
-
-            if (type === 'tipe') {
-                targetIds = ['inv_tipe_insiden', 'inv_subtipe_insiden'];
-                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Tipe Insiden" dan "Sub Tipe Insiden" berdasarkan daftar Referensi IKP Kemenkes RI.\nATURAN WAJIB: Jawab dengan format persis seperti ini:\nTIPE: [jawaban tipe]\nSUB TIPE: [jawaban sub tipe]`;
-            } else if (type === 'harm_causa') {
-                targetIds = ['inv_tipe_harm', 'inv_causa'];
-                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Tipe Harm" dan "Causa" beserta Kode ICD-10 yang paling spesifik.\nATURAN WAJIB:\nHARM: [kode ICD-10] - [Deskripsi] ([Terjemahan])\nCAUSA: [kode ICD-10] - [Deskripsi] ([Terjemahan])`;
-            } else if (type === 'masalah_cmp') {
-                targetIds = ['inv_masalah_cmp'];
-                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Care Management Problem (CMP)". Tuliskan HANYA poin masalahnya. Jika tidak ada, tuliskan "Tidak ada".`;
-            } else if (type === 'masalah_sdp') {
-                targetIds = ['inv_masalah_sdp'];
-                prompt = `Berdasarkan data insiden berikut:\n${context}\nTentukan "Service Delivery Problem (SDP)". Tuliskan HANYA poin masalahnya. Jika tidak ada, tuliskan "Tidak ada".`;
-            } else if (type === 'penyebab') {
-                targetIds = ['inv_penyebab_langsung'];
-                const cmp = document.getElementById('inv_masalah_cmp').value || 'Tidak ada';
-                const sdp = document.getElementById('inv_masalah_sdp').value || 'Tidak ada';
-                prompt = `Berdasarkan data insiden:\n${context}\nMasalah CMP: ${cmp}\nMasalah SDP: ${sdp}\nSebutkan "Penyebab Langsung" (Immediate Cause) secara ringkas.`;
-            } else if (type === 'akar') {
-                targetIds = ['inv_akar_masalah'];
-                const penyebab = document.getElementById('inv_penyebab_langsung').value;
-                prompt = `Berdasarkan data insiden:\n${context}\nPenyebab Langsung: ${penyebab}\nLakukan "5-Why" untuk mencari akar masalah.`;
-            } else if (type === 'orang_terlibat') {
-                targetIds = ['inv_orang_terlibat'];
-                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan "Orang yang terlibat" sebagai penyebab langsung. Tuliskan profesi/pihaknya saja.`;
-            } else if (type === 'proses_fase') {
-                targetIds = ['inv_proses_fase'];
-                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan "Proses / fase pelayanan" saat insiden. Tuliskan nama fasenya saja.`;
-            } else if (type === 'faktor') {
-                targetIds = ['inv_faktor_1']; 
-                const akar = document.getElementById('inv_akar_masalah').value;
-                prompt = `Berdasarkan data insiden:\n${context}\nAkar Masalah: ${akar}\nSebutkan maksimal 4 "Faktor Kontributor" (FAKTOR STAF, PASIEN, EKSTERNAL, FASYANKES, LINGKUNGAN). AWALI baris dengan angka "1. " dst.`;
-            } else if (type === 'mitigasi') {
-                targetIds = ['inv_mitigasi_pasien', 'inv_mitigasi_petugas', 'inv_mitigasi_fasyankes', 'inv_mitigasi_faktor'];
-                const akar = document.getElementById('inv_akar_masalah').value || 'Belum diidentifikasi';
-                prompt = `Berdasarkan data insiden:\n${context}\nAkar Masalah: ${akar}\nSebutkan "Faktor Mitigasi" (kondisi untuk meminimalisir dampak).\nATURAN WAJIB:\nPASIEN: [mitigasi]\nPETUGAS: [mitigasi]\nFASYANKES: [mitigasi]\nFAKTOR: [mitigasi]`;
-            } else if (type === 'deteksi') {
-                targetIds = ['inv_cara_deteksi'];
-                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan "Cara mendeteksi insiden" yang paling logis. Tuliskan caranya saja.`;
-            } else if (type === 'dampak_fasyankes') {
-                targetIds = ['inv_dampak_fasyankes'];
-                prompt = `Berdasarkan data insiden:\n${context}\nSebutkan perkiraan "Dampak pada Fasyankes". Tuliskan dampaknya saja.`;
-            } else if (type === 'rekomendasi') {
-                targetIds = ['inv_rekomendasi_akhir'];
-                const akar = document.getElementById('inv_akar_masalah').value;
-                prompt = `Akar Masalah: ${akar}\nSebutkan rekomendasi perbaikan (Action Plan) spesifik.`;
-            } else if (type === 'tindakan_akan') {
-                targetIds = ['inv_tindakan_akan'];
-                const rekomendasi = document.getElementById('inv_rekomendasi_akhir').value || 'Belum diidentifikasi';
-                prompt = `Berdasarkan data insiden:\n${context}\nRekomendasi: ${rekomendasi}\nSebutkan "Tindakan yang akan dilakukan" secara konkrit.`;
-            } else if (type === 'tindakan_perbaikan') {
-                targetIds = ['inv_perbaikan_pasien', 'inv_perbaikan_fasyankes'];
-                const rekomendasi = document.getElementById('inv_rekomendasi_akhir').value || 'Belum diidentifikasi';
-                prompt = `Berdasarkan data insiden:\n${context}\nRekomendasi: ${rekomendasi}\nSebutkan "Tindakan perbaikan".\nATURAN WAJIB:\nPASIEN: [tindakan]\nFASYANKES: [tindakan]`;
-            } else if (type === 'tindakan_kurangi_risiko') {
-                targetIds = ['inv_kurangi_pasien', 'inv_kurangi_petugas', 'inv_kurangi_fasyankes', 'inv_kurangi_faktor'];
-                const akar = document.getElementById('inv_akar_masalah').value || 'Belum diidentifikasi';
-                prompt = `Berdasarkan data insiden:\n${context}\nAkar Masalah: ${akar}\nSebutkan "Tindakan untuk mengurangi risiko".\nATURAN WAJIB:\nPASIEN: [tindakan]\nPETUGAS: [tindakan]\nFASYANKES: [tindakan]\nFAKTOR: [tindakan]`;
-            }
+            if (type === 'tipe') { targetIds = ['inv_tipe_insiden', 'inv_subtipe_insiden']; prompt = `${context}\nTentukan TIPE: dan SUB TIPE: (Kemenkes).`; }
+            else if (type === 'harm_causa') { targetIds = ['inv_tipe_harm', 'inv_causa']; prompt = `${context}\nTentukan HARM: dan CAUSA: (ICD-10).`; }
+            else if (type === 'masalah_cmp') { targetIds = ['inv_masalah_cmp']; prompt = `${context}\nTentukan CMP.`; }
+            else if (type === 'masalah_sdp') { targetIds = ['inv_masalah_sdp']; prompt = `${context}\nTentukan SDP.`; }
+            else if (type === 'penyebab') { targetIds = ['inv_penyebab_langsung']; prompt = `${context}\nSebutkan Penyebab Langsung.`; }
+            else if (type === 'akar') { targetIds = ['inv_akar_masalah']; prompt = `${context}\nLakukan 5-Why Akar Masalah.`; }
+            else if (type === 'orang_terlibat') { targetIds = ['inv_orang_terlibat']; prompt = `${context}\nSiapa yang terlibat?`; }
+            else if (type === 'proses_fase') { targetIds = ['inv_proses_fase']; prompt = `${context}\nFase pelayanan?`; }
+            else if (type === 'faktor') { targetIds = ['inv_faktor_1']; prompt = `${context}\nSebutkan 4 Faktor Kontributor (1. dst).`; }
+            else if (type === 'mitigasi') { targetIds = ['inv_mitigasi_pasien', 'inv_mitigasi_petugas', 'inv_mitigasi_fasyankes', 'inv_mitigasi_faktor']; prompt = `${context}\nMitigasi PASIEN:, PETUGAS:, FASYANKES:, FAKTOR:.`; }
+            else if (type === 'deteksi') { targetIds = ['inv_cara_deteksi']; prompt = `${context}\nCara deteksi?`; }
+            else if (type === 'dampak_fasyankes') { targetIds = ['inv_dampak_fasyankes']; prompt = `${context}\nDampak Fasyankes?`; }
+            else if (type === 'rekomendasi') { targetIds = ['inv_rekomendasi_akhir']; prompt = `${context}\nRekomendasi perbaikan.`; }
+            else if (type === 'tindakan_akan') { targetIds = ['inv_tindakan_akan']; prompt = `${context}\nTindakan yang akan dilakukan.`; }
+            else if (type === 'tindakan_perbaikan') { targetIds = ['inv_perbaikan_pasien', 'inv_perbaikan_fasyankes']; prompt = `${context}\nPerbaikan PASIEN:, FASYANKES:.`; }
+            else if (type === 'tindakan_kurangi_risiko') { targetIds = ['inv_kurangi_pasien', 'inv_kurangi_petugas', 'inv_kurangi_fasyankes', 'inv_kurangi_faktor']; prompt = `${context}\nKurangi Risiko PASIEN:, PETUGAS:, FASYANKES:, FAKTOR:.`; }
 
             try {
                 const resultText = await fetchGeminiWithBackoff(prompt);
-                
-                // Parsing logic untuk yang bercabang
                 if (type === 'tipe') {
-                    const tipeMatch = resultText.match(/TIPE:\s*(.*)/i);
-                    const subTipeMatch = resultText.match(/SUB TIPE:\s*(.*)/i);
-                    if(tipeMatch) document.getElementById('inv_tipe_insiden').value = tipeMatch[1].trim();
-                    if(subTipeMatch) document.getElementById('inv_subtipe_insiden').value = subTipeMatch[1].trim();
-                    if(!tipeMatch && !subTipeMatch) document.getElementById('inv_tipe_insiden').value = resultText.trim();
-                } 
-                else if (type === 'harm_causa') {
-                    const harmMatch = resultText.match(/HARM:\s*(.*)/i);
-                    const causaMatch = resultText.match(/CAUSA:\s*(.*)/i);
-                    if(harmMatch) document.getElementById('inv_tipe_harm').value = harmMatch[1].trim();
-                    if(causaMatch) document.getElementById('inv_causa').value = causaMatch[1].trim();
-                    if(!harmMatch && !causaMatch) document.getElementById('inv_tipe_harm').value = resultText.trim();
-                }
-                else if (type === 'masalah_cmp' || type === 'masalah_sdp') {
+                    const tMatch = resultText.match(/TIPE:\s*(.*)/i); const sMatch = resultText.match(/SUB TIPE:\s*(.*)/i);
+                    if(tMatch) document.getElementById('inv_tipe_insiden').value = tMatch[1].trim();
+                    if(sMatch) document.getElementById('inv_subtipe_insiden').value = sMatch[1].trim();
+                } else if (type === 'harm_causa') {
+                    const hMatch = resultText.match(/HARM:\s*(.*)/i); const cMatch = resultText.match(/CAUSA:\s*(.*)/i);
+                    if(hMatch) document.getElementById('inv_tipe_harm').value = hMatch[1].trim();
+                    if(cMatch) document.getElementById('inv_causa').value = cMatch[1].trim();
+                } else if (type === 'faktor') {
+                    const lines = resultText.split('\n').filter(l => l.trim().match(/^\d+\./));
+                    for(let i=1; i<=4; i++) if(lines[i-1]) document.getElementById(`inv_faktor_${i}`).value = lines[i-1].replace(/^\d+\.\s*/, '').trim();
+                } else if (type === 'mitigasi' || type === 'tindakan_kurangi_risiko') {
+                    const pMatch = resultText.match(/PASIEN:\s*(.*)/i); const sMatch = resultText.match(/PETUGAS:\s*(.*)/i);
+                    const fMatch = resultText.match(/FASYANKES:\s*(.*)/i); const xMatch = resultText.match(/FAKTOR:\s*(.*)/i);
+                    const prefix = type === 'mitigasi' ? 'inv_mitigasi' : 'inv_kurangi';
+                    if(pMatch) document.getElementById(`${prefix}_pasien`).value = pMatch[1].trim();
+                    if(sMatch) document.getElementById(`${prefix}_petugas`).value = sMatch[1].trim();
+                    if(fMatch) document.getElementById(`${prefix}_fasyankes`).value = fMatch[1].trim();
+                    if(xMatch) document.getElementById(`${prefix}_faktor`).value = xMatch[1].trim();
+                } else if (type === 'tindakan_perbaikan') {
+                    const pMatch = resultText.match(/PASIEN:\s*(.*)/i); const fMatch = resultText.match(/FASYANKES:\s*(.*)/i);
+                    if(pMatch) document.getElementById('inv_perbaikan_pasien').value = pMatch[1].trim();
+                    if(fMatch) document.getElementById('inv_perbaikan_fasyankes').value = fMatch[1].trim();
+                } else {
                     document.getElementById(targetIds[0]).value = resultText.trim();
                 }
-                else if (type === 'faktor') {
-                    const lines = resultText.split('\n').filter(line => line.trim().match(/^\d+\./));
-                    if (lines.length > 0) {
-                        if (lines[0]) document.getElementById('inv_faktor_1').value = lines[0].replace(/^\d+\.\s*/, '').trim();
-                        if (lines[1]) document.getElementById('inv_faktor_2').value = lines[1].replace(/^\d+\.\s*/, '').trim();
-                        if (lines[2]) document.getElementById('inv_faktor_3').value = lines[2].replace(/^\d+\.\s*/, '').trim();
-                        if (lines[3]) document.getElementById('inv_faktor_4').value = lines[3].replace(/^\d+\.\s*/, '').trim();
-                    } else {
-                        document.getElementById('inv_faktor_1').value = resultText.trim();
-                    }
-                }
-                else if (type === 'mitigasi') {
-                    const match1 = resultText.match(/PASIEN:\s*(.*)/i);
-                    const match2 = resultText.match(/PETUGAS:\s*(.*)/i);
-                    const match3 = resultText.match(/FASYANKES:\s*(.*)/i);
-                    const match4 = resultText.match(/FAKTOR:\s*(.*)/i);
-                    if(match1) document.getElementById('inv_mitigasi_pasien').value = match1[1].trim();
-                    if(match2) document.getElementById('inv_mitigasi_petugas').value = match2[1].trim();
-                    if(match3) document.getElementById('inv_mitigasi_fasyankes').value = match3[1].trim();
-                    if(match4) document.getElementById('inv_mitigasi_faktor').value = match4[1].trim();
-                }
-                else if (type === 'tindakan_perbaikan') {
-                    const match1 = resultText.match(/PASIEN:\s*(.*)/i);
-                    const match2 = resultText.match(/FASYANKES:\s*(.*)/i);
-                    if(match1) document.getElementById('inv_perbaikan_pasien').value = match1[1].trim();
-                    if(match2) document.getElementById('inv_perbaikan_fasyankes').value = match2[1].trim();
-                } 
-                else if (type === 'tindakan_kurangi_risiko') {
-                    const match1 = resultText.match(/PASIEN:\s*(.*)/i);
-                    const match2 = resultText.match(/PETUGAS:\s*(.*)/i);
-                    const match3 = resultText.match(/FASYANKES:\s*(.*)/i);
-                    const match4 = resultText.match(/FAKTOR:\s*(.*)/i);
-                    if(match1) document.getElementById('inv_kurangi_pasien').value = match1[1].trim();
-                    if(match2) document.getElementById('inv_kurangi_petugas').value = match2[1].trim();
-                    if(match3) document.getElementById('inv_kurangi_fasyankes').value = match3[1].trim();
-                    if(match4) document.getElementById('inv_kurangi_faktor').value = match4[1].trim();
-                } 
-                else {
-                    const targetEl = document.getElementById(targetIds[0]);
-                    if (targetEl.tagName === 'INPUT') {
-                        targetEl.value = resultText.replace(/\*/g, '').trim();
-                    } else {
-                        if(targetEl.value.trim() !== '') {
-                            targetEl.value += '\n\n--- SARAN AI ---\n' + resultText.trim();
-                        } else {
-                            targetEl.value = resultText.trim();
-                        }
-                    }
-                }
-
-                triggerAutoSave();
-                showMessage("Saran AI berhasil dimuat", "success");
-                
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
+                btn.innerHTML = originalHtml; btn.disabled = false; triggerAutoSave();
             } catch (error) {
-                if (error.message === "API_FAIL_ROTATE") {
-                    showMessage("Menunggu rotasi API/Model otomatis...", "info");
-                    isWaitingForRetry = () => generateAIInvestigasi(type, btn);
-                    lastFailedAction = () => generateAIInvestigasi(type, btn);
-                } else if (error.message === "SAFETY_BLOCK") {
-                    showMessage("Analisis diblokir Filter Keamanan Google AI (konten terlalu eksplisit).", "error");
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
-                } else {
-                    console.error("AI Error:", error);
-                    showMessage("Gagal menganalisis. Cek koneksi Anda.", "error");
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
-                }
+                if (error.message === "API_FAIL_ROTATE") { isWaitingForRetry = () => generateAIInvestigasi(type, btn); lastFailedAction = () => generateAIInvestigasi(type, btn); }
+                else { btn.innerHTML = originalHtml; btn.disabled = false; }
             }
         }
 
-        // --- ENKRIPSI SEDERHANA (XOR) UNTUK PASSWORD DRAFT ---
         function encryptDecrypt(text, password) {
-            let result = '';
-            for(let i = 0; i < text.length; i++) {
-                result += String.fromCharCode(text.charCodeAt(i) ^ password.charCodeAt(i % password.length));
-            }
+            let result = ''; for(let i = 0; i < text.length; i++) { result += String.fromCharCode(text.charCodeAt(i) ^ password.charCodeAt(i % password.length)); }
             return result;
         }
 
-        // --- DATA MANAGEMENT (SAVE/LOAD/AUTO-SAVE) ---
         function getFormData() {
-            const inputs = document.querySelectorAll('.auto-save');
-            const data = {};
-            inputs.forEach(input => {
-                if(input.id) data[input.id] = input.value;
-            });
+            const inputs = document.querySelectorAll('.auto-save'); const data = {};
+            inputs.forEach(input => { if(input.id) data[input.id] = input.value; });
             return data;
         }
 
@@ -1544,40 +1277,22 @@
                     if (input.tagName === 'SELECT') input.dispatchEvent(new Event('change'));
                 }
             });
-            
-            if (data.kronologis && Array.isArray(data.kronologis)) {
-                document.getElementById('kronologis_insiden').value = data.kronologis.map(k => `[${k.time}] ${k.text}`).join('\n');
-            }
-
             if (data.final_narasi) document.getElementById('narasi_result_container').classList.remove('hidden');
-            
-            handlePelaporChange();
-            handlePelaporNakesChange();
-            handleTindakLanjutChange();
-            handlePernahTerjadiChange();
-            calculateGrading();
+            handlePelaporChange(); handleTindakLanjutChange(); handlePernahTerjadiChange(); calculateGrading();
         }
 
         function triggerAutoSave() {
-            clearTimeout(autoSaveTimer);
-            showSavingIndicator(true);
+            clearTimeout(autoSaveTimer); showSavingIndicator(true);
             autoSaveTimer = setTimeout(() => {
-                const data = getFormData();
-                localStorage.setItem('ikp_draft_data', JSON.stringify(data));
+                localStorage.setItem('ikp_draft_data', JSON.stringify(getFormData()));
                 showSavingIndicator(false);
             }, 1000);
         }
 
         function showSavingIndicator(isSaving) {
-            const ind = document.getElementById('autoSaveIndicator');
-            const txt = document.getElementById('autoSaveText');
-            if (isSaving) {
-                ind.classList.add('saving-active');
-                txt.innerText = "Menyimpan draft...";
-            } else {
-                ind.classList.remove('saving-active');
-                txt.innerText = "Draft tersimpan di browser";
-            }
+            const ind = document.getElementById('autoSaveIndicator'); const txt = document.getElementById('autoSaveText');
+            if (isSaving) { ind.classList.add('saving-active'); txt.innerText = "Menyimpan..."; }
+            else { ind.classList.remove('saving-active'); txt.innerText = "Tersimpan"; }
         }
 
         function setupAutoSave() {
@@ -1589,129 +1304,63 @@
         }
 
         function loadDraftFromLocalStorage() {
-            try {
-                const draft = localStorage.getItem('ikp_draft_data');
-                if (draft) {
-                    fillFormData(JSON.parse(draft));
-                    document.getElementById('autoSaveText').innerText = "Draft dimuat ulang";
-                }
-            } catch (e) {
-                console.error("Gagal load draft lokal", e);
-            }
+            try { const draft = localStorage.getItem('ikp_draft_data'); if (draft) fillFormData(JSON.parse(draft)); } catch (e) {}
         }
 
         function clearFormSilently() {
             const inputs = document.querySelectorAll('.auto-save');
-            inputs.forEach(input => {
-                if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
-                else input.value = '';
-            });
+            inputs.forEach(input => { if (input.type !== 'hidden') input.value = ''; });
             document.getElementById('narasi_result_container').classList.add('hidden');
             document.getElementById('ai_suggestion_box').classList.add('hidden');
-            
-            handlePelaporChange();
-            handleTindakLanjutChange();
-            handlePernahTerjadiChange();
-            calculateGrading();
-            
+            handlePelaporChange(); handleTindakLanjutChange(); handlePernahTerjadiChange(); calculateGrading();
             localStorage.removeItem('ikp_draft_data');
-            document.getElementById('autoSaveText').innerText = "Sistem Siap";
         }
 
-        // --- SISTEM MODAL KUSTOM UNTUK MENGGANTIKAN ALERT/PROMPT/CONFIRM ---
         function resetFormWithConfirm() {
             showCustomModal({
-                type: 'confirm',
-                title: 'Kosongkan Form',
-                body: 'Yakin ingin mengosongkan semua isian form pelaporan dan investigasi?',
-                confirmText: 'Ya, Kosongkan',
-                confirmColor: 'bg-red-600 hover:bg-red-700',
-                onConfirm: () => {
-                    clearFormSilently();
-                    showMessage("Form berhasil dikosongkan.", "info");
-                }
+                type: 'confirm', title: 'Kosongkan Form', body: 'Yakin ingin mengosongkan semua isian?',
+                confirmText: 'Ya', confirmColor: 'bg-red-600', onConfirm: () => { clearFormSilently(); showMessage("Kosong", "info"); }
             });
         }
 
         function promptSaveDraft() {
             showCustomModal({
-                type: 'prompt',
-                title: 'Simpan Draft File (TXT)',
-                body: 'Anda dapat mengamankan file draft ini dengan password. Biarkan kosong jika tidak ingin diproteksi password.',
-                placeholder: 'Masukkan password opsional...',
-                confirmText: 'Simpan & Unduh',
-                onConfirm: (pwd) => exportData(pwd)
+                type: 'prompt', title: 'Simpan Draft', body: 'Password opsional:', placeholder: 'Password...',
+                confirmText: 'Unduh', onConfirm: (pwd) => exportData(pwd)
             });
         }
 
         function exportData(pwd) {
-            const data = getFormData();
-            let jsonStr = JSON.stringify(data, null, 2);
+            const jsonStr = JSON.stringify(getFormData(), null, 2);
             let finalStr = jsonStr;
-
-            if (pwd && pwd.trim() !== "") {
-                const encryptedData = btoa(encryptDecrypt(encodeURIComponent(jsonStr), pwd));
-                finalStr = "ENC:" + encryptedData;
-            }
-
-            const dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(finalStr);
+            if (pwd && pwd.trim() !== "") finalStr = "ENC:" + btoa(encryptDecrypt(encodeURIComponent(jsonStr), pwd));
             const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(finalStr));
             dlAnchorElem.setAttribute("download", `Draft_IKP_${new Date().toISOString().slice(0,10)}.txt`);
-            
-            // Tambahkan elemen ke body sesaat agar support klik di dalam iframe Canvas
-            document.body.appendChild(dlAnchorElem);
-            dlAnchorElem.click();
-            document.body.removeChild(dlAnchorElem);
-
-            if (pwd && pwd.trim() !== "") {
-                clearFormSilently();
-                showMessage("Draft dikunci dengan password. Form telah dikosongkan otomatis demi keamanan.", "success");
-            } else {
-                showMessage("Draft berhasil disimpan ke komputer Anda.", "success");
-            }
+            document.body.appendChild(dlAnchorElem); dlAnchorElem.click(); document.body.removeChild(dlAnchorElem);
         }
 
         function loadDraft(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
+            const file = event.target.files[0]; if (!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
                 let content = e.target.result;
                 try {
                     if (content.startsWith("ENC:")) {
                         showCustomModal({
-                            type: 'prompt',
-                            title: 'Buka Draft Terkunci',
-                            body: 'File draft ini dilindungi oleh password. Masukkan password Anda untuk membukanya:',
-                            placeholder: 'Password draft',
-                            confirmText: 'Buka File',
+                            type: 'prompt', title: 'Draft Terkunci', body: 'Masukkan password:', confirmText: 'Buka',
                             onConfirm: (pwd) => {
-                                try {
-                                    const decryptedStr = decodeURIComponent(encryptDecrypt(atob(content.substring(4)), pwd));
-                                    const data = JSON.parse(decryptedStr);
-                                    fillFormData(data);
-                                    showMessage("Draft yang terkunci berhasil dimuat.", "success");
-                                } catch(err) {
-                                    showMessage("Password salah atau file tidak valid.", "error");
-                                }
+                                try { fillFormData(JSON.parse(decodeURIComponent(encryptDecrypt(atob(content.substring(4)), pwd)))); }
+                                catch(err) { showMessage("Salah", "error"); }
                             }
                         });
-                    } else {
-                        const data = JSON.parse(content);
-                        fillFormData(data);
-                        showMessage("Draft berhasil dimuat.", "success");
-                    }
-                } catch (error) {
-                    showMessage("Gagal memuat. Format file rusak.", "error");
-                }
+                    } else { fillFormData(JSON.parse(content)); }
+                } catch (error) { showMessage("Rusak", "error"); }
             };
-            reader.readAsText(file);
-            event.target.value = ''; // Reset file input
+            reader.readAsText(file); event.target.value = '';
         }
 
-        // --- PDF GENERATION ---
+        // --- MODIFIKASI: FUNGSI CETAK PDF NATIVE (TEXT BASED) ---
         function generatePDF() {
             const v = (id) => {
                 const el = document.getElementById(id);
@@ -1721,21 +1370,20 @@
             };
             const fDate = (val) => val ? new Date(val).toLocaleString('id-ID') : '-';
 
-            // SEC A
+            // Mapping Data Pasien
             document.getElementById('pr_kelompok_umur').innerText = v('kelompok_umur');
             document.getElementById('pr_umur_detail').innerText = `${v('umur_tahun')} Thn, ${v('umur_bulan')} Bln, ${v('umur_hari')} Hari`;
             document.getElementById('pr_penanggung_biaya').innerText = v('penanggung_biaya');
             document.getElementById('pr_jenis_kelamin').innerText = v('jenis_kelamin');
             document.getElementById('pr_tgl_pelayanan').innerText = fDate(document.getElementById('tgl_pelayanan').value);
 
-            // SEC B
+            // Mapping Rincian Kejadian
             document.getElementById('pr_waktu_insiden').innerText = fDate(document.getElementById('waktu_insiden').value);
             document.getElementById('pr_insiden').innerText = v('insiden');
             document.getElementById('pr_kronologis').innerText = document.getElementById('final_narasi').value || document.getElementById('kronologis_insiden').value || "-";
             document.getElementById('pr_jenis_insiden').innerText = v('jenis_insiden');
             
-            let pelAwal = v('pelayanan_awal');
-            if (pelAwal.includes('Lain')) pelAwal += ` (${v('pelayanan_awal_lain')})`;
+            let pelAwal = v('pelayanan_awal'); if (pelAwal.includes('Lain')) pelAwal += ` (${v('pelayanan_awal_lain')})`;
             document.getElementById('pr_pelayanan_awal').innerText = pelAwal;
 
             document.getElementById('pr_dampak').innerText = v('dampak_insiden');
@@ -1744,30 +1392,24 @@
             
             let pelapor = v('pelapor_pertama');
             if (pelapor === 'Tenaga Kesehatan') pelapor += ` (${v('pelapor_nakes')})`;
-            if (pelapor.includes('Lain') || pelapor.includes('Lainnya')) pelapor += ` (${v('pelapor_lain')})`;
+            if (pelapor.includes('Lain')) pelapor += ` (${v('pelapor_lain')})`;
             document.getElementById('pr_pelapor').innerText = pelapor;
 
             document.getElementById('pr_lokasi').innerText = v('lokasi_kejadian');
-
-            let tempat = v('tempat_insiden');
-            if (tempat.includes('Lain')) tempat += ` (${v('tempat_insiden_lain')})`;
+            let tempat = v('tempat_insiden'); if (tempat.includes('Lain')) tempat += ` (${v('tempat_insiden_lain')})`;
             document.getElementById('pr_tempat').innerText = tempat;
 
-            let pelTerkait = v('pelayanan_terkait');
-            if (pelTerkait.includes('Lain')) pelTerkait += ` (${v('pelayanan_terkait_lain')})`;
+            let pelTerkait = v('pelayanan_terkait'); if (pelTerkait.includes('Lain')) pelTerkait += ` (${v('pelayanan_terkait_lain')})`;
             document.getElementById('pr_pelayanan_terkait').innerText = pelTerkait;
 
             document.getElementById('pr_tindakan_segera').innerText = v('tindakan_segera');
-            
-            let t_oleh = v('tindak_lanjut_oleh');
-            if (t_oleh === 'Tim' || t_oleh === 'Petugas Lainnya') t_oleh += ` (${v('tindak_lanjut_detail')})`;
+            let t_oleh = v('tindak_lanjut_oleh'); if (t_oleh === 'Tim' || t_oleh === 'Petugas Lainnya') t_oleh += ` (${v('tindak_lanjut_detail')})`;
             document.getElementById('pr_tindak_lanjut_oleh').innerText = t_oleh;
             
-            let p_terjadi = v('pernah_terjadi');
-            if (p_terjadi === 'Ya') p_terjadi += `\n(Tindakan Pencegahan: ${v('tindakan_pencegahan')})`;
+            let p_terjadi = v('pernah_terjadi'); if (p_terjadi === 'Ya') p_terjadi += `\n(Pencegahan: ${v('tindakan_pencegahan')})`;
             document.getElementById('pr_pernah_terjadi').innerText = p_terjadi;
 
-            // INVESTIGASI
+            // Mapping Investigasi
             document.getElementById('pr_inv_1_tipe').innerText = v('inv_tipe_insiden');
             document.getElementById('pr_inv_1_subtipe').innerText = v('inv_subtipe_insiden');
             document.getElementById('pr_inv_2_harm').innerText = v('inv_tipe_harm');
@@ -1779,102 +1421,37 @@
             document.getElementById('pr_inv_5').innerText = v('inv_orang_terlibat');
             document.getElementById('pr_inv_6').innerText = v('inv_proses_fase');
             
-            // Faktor Kontributor (List)
-            const flist = document.getElementById('pr_inv_7_list');
-            flist.innerHTML = '';
-            for(let i=1; i<=4; i++) {
-                let val = document.getElementById(`inv_faktor_${i}`).value;
-                if(val) {
-                    let li = document.createElement('li');
-                    li.innerText = val;
-                    flist.appendChild(li);
-                }
-            }
+            const flist = document.getElementById('pr_inv_7_list'); flist.innerHTML = '';
+            for(let i=1; i<=4; i++) { let val = v(`inv_faktor_${i}`); if(val && val !== '-') { let li = document.createElement('li'); li.innerText = val; flist.appendChild(li); } }
 
             document.getElementById('pr_inv_8a').innerText = v('inv_mitigasi_pasien');
             document.getElementById('pr_inv_8b').innerText = v('inv_mitigasi_petugas');
             document.getElementById('pr_inv_8c').innerText = v('inv_mitigasi_fasyankes');
             document.getElementById('pr_inv_8d').innerText = v('inv_mitigasi_faktor');
-            
             document.getElementById('pr_inv_9').innerText = v('inv_cara_deteksi');
             document.getElementById('pr_inv_10').innerText = v('inv_dampak_fasyankes');
             document.getElementById('pr_inv_11').innerText = v('inv_rekomendasi_akhir');
             document.getElementById('pr_inv_12').innerText = v('inv_tindakan_akan');
-            
             document.getElementById('pr_inv_13a').innerText = v('inv_perbaikan_pasien');
             document.getElementById('pr_inv_13b').innerText = v('inv_perbaikan_fasyankes');
-            
             document.getElementById('pr_inv_14a').innerText = v('inv_kurangi_pasien');
             document.getElementById('pr_inv_14b').innerText = v('inv_kurangi_petugas');
             document.getElementById('pr_inv_14c').innerText = v('inv_kurangi_fasyankes');
             document.getElementById('pr_inv_14d').innerText = v('inv_kurangi_faktor');
 
-            // Show Print, Hide App
-            showMessage("Menyiapkan dokumen PDF... Mohon tunggu sebentar.", "info");
-            
-            document.getElementById('appContainer').style.display = 'none';
-            document.getElementById('printViewContainer').style.display = 'block';
-
-            // Menggunakan html2pdf.js untuk mengunduh PDF secara langsung (Bypass pemblokiran iframe)
-            const element = document.getElementById('printContent');
-            const opt = {
-                margin:       10,
-                filename:     `Laporan_IKP_${new Date().toISOString().slice(0,10)}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-
-            setTimeout(() => {
-                html2pdf().set(opt).from(element).save().then(() => {
-                    // Segera kembalikan tampilan setelah unduhan selesai
-                    document.getElementById('appContainer').style.display = 'block';
-                    document.getElementById('printViewContainer').style.display = 'none';
-
-                    // Tanyakan kepada user apakah form mau dikosongkan
-                    setTimeout(() => {
-                        showCustomModal({
-                            type: 'confirm',
-                            title: 'Unduhan PDF Selesai',
-                            body: 'File PDF berhasil diunduh ke perangkat Anda. Apakah Anda ingin mengosongkan seluruh form untuk pelaporan baru sekarang?',
-                            confirmText: 'Ya, Kosongkan Form',
-                            confirmColor: 'bg-red-600 hover:bg-red-700',
-                            onConfirm: () => {
-                                clearFormSilently();
-                                showMessage("Form telah berhasil dikosongkan.", "success");
-                            }
-                        });
-                    }, 500);
-                }).catch(err => {
-                    console.error(err);
-                    document.getElementById('appContainer').style.display = 'block';
-                    document.getElementById('printViewContainer').style.display = 'none';
-                    showMessage("Gagal membuat PDF.", "error");
-                });
-            }, 500);
+            // Cetak Native (Membuka dialog print browser)
+            window.print();
         }
 
-        // --- CUSTOM MESSAGE BOX ---
         function showMessage(msg, type='info') {
             const box = document.createElement('div');
-            box.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white font-bold text-sm shadow-lg z-50 transition-all transform translate-y-10 opacity-0 flex items-center`;
-            
+            box.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg text-white font-bold text-sm shadow-lg z-50 transition-all transform translate-y-10 opacity-0`;
             if(type === 'error') box.classList.add('bg-red-600');
             else if(type === 'success') box.classList.add('bg-green-600');
-            else if(type === 'warning') box.classList.add('bg-yellow-600');
             else box.classList.add('bg-blue-600');
-            
-            box.innerText = msg;
-            document.body.appendChild(box);
-            
-            setTimeout(() => {
-                box.classList.remove('translate-y-10', 'opacity-0');
-            }, 10);
-            
-            setTimeout(() => {
-                box.classList.add('translate-y-10', 'opacity-0');
-                setTimeout(() => box.remove(), 300);
-            }, 3000);
+            box.innerText = msg; document.body.appendChild(box);
+            setTimeout(() => { box.classList.remove('translate-y-10', 'opacity-0'); }, 10);
+            setTimeout(() => { box.classList.add('translate-y-10', 'opacity-0'); setTimeout(() => box.remove(), 300); }, 3000);
         }
     </script>
 </body>
