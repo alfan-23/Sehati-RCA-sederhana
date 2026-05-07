@@ -103,6 +103,17 @@
             </div>
 
             <form id="ikpFormLaporan" class="p-5 md:p-8 space-y-10" onsubmit="event.preventDefault();">
+                
+                <div class="bg-teal-50 border border-teal-100 p-4 md:p-6 rounded-xl -mt-2 mb-2 shadow-sm">
+                    <label class="text-xs font-bold text-teal-800 uppercase block mb-2">Jenis Fasilitas Pelayanan Kesehatan</label>
+                    <select id="in-jenis" class="w-full md:w-1/2 border border-teal-300 rounded-lg p-2.5 outline-none text-sm bg-white font-bold text-teal-800 auto-save shadow-sm">
+                        <option value="Puskesmas">Puskesmas (PKM)</option>
+                        <option value="Klinik">Klinik</option>
+                        <option value="Rumah Sakit">Rumah Sakit (RS)</option>
+                        <option value="Dinas Kesehatan">Dinas Kesehatan (Dinkes)</option>
+                    </select>
+                </div>
+
                 <section>
                     <div class="flex items-center mb-6 border-b border-gray-100 pb-3">
                         <span class="bg-teal-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold mr-3 shadow-sm">A</span>
@@ -759,7 +770,7 @@
     <div id="printViewContainer" class="hidden">
         <div id="printContent" class="print-content bg-white w-[210mm] min-h-[297mm] mx-auto p-10 text-black">
             <h1 class="text-center font-bold text-xl mb-1 uppercase">LAPORAN INSIDEN KESELAMATAN PASIEN (IKP)</h1>
-            <h2 class="text-center font-bold text-md mb-6 uppercase">INTERNAL PUSKESMAS</h2>
+            <h2 class="text-center font-bold text-md mb-6 uppercase">INTERNAL <span id="pr_jenis_fasyankes">PUSKESMAS</span></h2>
             
             <table class="print-table">
                 <tr><th colspan="2" class="font-bold text-center">A. DATA PASIEN</th></tr>
@@ -896,22 +907,10 @@
 
     <script>
         let apiKey = ""; 
-        let apiModel = "gemini-2.5-flash";
+        let apiModel = "";
         let autoSaveTimer = null;
         let isWaitingForRetry = null;
         let lastFailedAction = null;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const keyFromUrl = urlParams.get('key');
-        const modelFromUrl = urlParams.get('model');
-        
-        if (keyFromUrl) apiKey = keyFromUrl;
-        if (modelFromUrl) apiModel = modelFromUrl;
-        
-        if (keyFromUrl || modelFromUrl) {
-            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.replaceState({path: cleanUrl}, '', cleanUrl);
-        }
 
         window.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'UPDATE_CONFIG') {
@@ -946,10 +945,30 @@
         });
 
         window.onload = () => {
+            apiKey = sessionStorage.getItem('sehati_api_key') || "";
+            apiModel = sessionStorage.getItem('sehati_ai_model') || "";
+
             setupAutoSave();
             loadDraftFromLocalStorage();
             calculateGrading();
-            if (!apiKey && window.parent !== window) {
+            
+            // Auto-select jenis fasyankes berdasarkan session storage
+            const savedKategori = sessionStorage.getItem('kategori');
+            if (savedKategori) {
+                const selectJenis = document.getElementById('in-jenis');
+                if(selectJenis) {
+                    for(let i = 0; i < selectJenis.options.length; i++) {
+                        if(selectJenis.options[i].value.toLowerCase().includes(savedKategori.toLowerCase()) || savedKategori.toLowerCase().includes(selectJenis.options[i].value.toLowerCase())) {
+                            selectJenis.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (window.parent === window) {
+                showMessage("Akses Ditolak: Aplikasi harus dijalankan dari Dashboard Utama", "error");
+            } else {
                 window.parent.postMessage({ type: 'REQUEST_CONFIG' }, '*');
             }
         };
@@ -1125,7 +1144,7 @@
         }
 
         async function fetchGeminiWithBackoff(prompt, maxRetries = 5) {
-            if (!apiKey) { showMessage("API Key belum dikonfigurasi dari Dashboard.", "error"); throw new Error("API Key kosong"); }
+            if (!apiKey || !apiModel) { showMessage("API Key belum dikonfigurasi dari Dashboard Utama.", "error"); throw new Error("API Key kosong"); }
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
             const payload = { contents: [{ parts: [{ text: "Instruksi Sistem: Anda adalah asisten medis profesional untuk pelaporan IKP yang berpedoman pada Referensi IKP Kementerian Kesehatan RI. Jawablah SECARA LANGSUNG, baku, dan objektif tanpa kata pengantar/basa-basi. JANGAN memberikan opsi ganda kecuali diminta.\n\n" + prompt }] }] };
             let retries = 0; const delays = [1000, 2000, 4000, 8000, 16000];
@@ -1164,7 +1183,10 @@
             btn.disabled = true;
             container.classList.remove('hidden');
             textarea.value = "Mengumpulkan informasi..."; textarea.classList.add('bg-ai-gradient');
-            const prompt = `Susunlah sebuah narasi medis baku untuk laporan IKP berdasarkan catatan kronologis berikut:\n\n${rawText}\n\nATURAN WAJIB:\n1. Gabungkan menjadi 1 paragraf narasi yang mengalir.\n2. Tuliskan HANYA narasinya saja secara LANGSUNG.`;
+            
+            const jenisFasyankes = document.getElementById('in-jenis').value;
+            const prompt = `Anda bertugas di ${jenisFasyankes}. Susunlah sebuah narasi medis baku untuk laporan IKP berdasarkan catatan kronologis berikut:\n\n${rawText}\n\nATURAN WAJIB:\n1. Gabungkan menjadi 1 paragraf narasi yang mengalir.\n2. Tuliskan HANYA narasinya saja secara LANGSUNG.`;
+            
             try {
                 const resultText = await fetchGeminiWithBackoff(prompt);
                 textarea.value = resultText.trim(); triggerAutoSave();
@@ -1186,7 +1208,10 @@
             const box = document.getElementById('ai_suggestion_box');
             const content = document.getElementById('ai_suggestion_content');
             box.classList.remove('hidden'); content.innerHTML = `Menganalisis...`;
-            const prompt = `Berdasarkan data insiden berikut:\nNama Insiden: ${namaInsiden}\nKronologis: ${narasi}\nBerikan rekomendasi: 1. Jenis Insiden, 2. Dampak, 3. Probabilitas.`;
+            
+            const jenisFasyankes = document.getElementById('in-jenis').value;
+            const prompt = `Berdasarkan data insiden di ${jenisFasyankes} berikut:\nNama Insiden: ${namaInsiden}\nKronologis: ${narasi}\nBerikan rekomendasi: 1. Jenis Insiden, 2. Dampak, 3. Probabilitas.`;
+            
             try {
                 const resultText = await fetchGeminiWithBackoff(prompt);
                 content.innerText = resultText.trim(); btn.innerHTML = originalHtml; btn.disabled = false;
@@ -1204,7 +1229,10 @@
             let originalHtml = btn.dataset.originalHtml || btn.innerHTML;
             btn.dataset.originalHtml = originalHtml;
             btn.innerHTML = `Proses...`; btn.disabled = true;
-            const context = `Nama Insiden: ${namaInsiden}\nKronologis: ${narasi}\n`;
+            
+            const jenisFasyankes = document.getElementById('in-jenis').value;
+            const context = `Jenis Fasyankes: ${jenisFasyankes}\nNama Insiden: ${namaInsiden}\nKronologis: ${narasi}\n`;
+            
             if (type === 'tipe') { targetIds = ['inv_tipe_insiden', 'inv_subtipe_insiden']; prompt = `${context}\nTentukan TIPE: dan SUB TIPE: (Kemenkes).`; }
             else if (type === 'harm_causa') { targetIds = ['inv_tipe_harm', 'inv_causa']; prompt = `${context}\nTentukan HARM: dan CAUSA: (ICD-10).`; }
             else if (type === 'masalah_cmp') { targetIds = ['inv_masalah_cmp']; prompt = `${context}\nTentukan CMP.`; }
@@ -1369,6 +1397,9 @@
                 return el.value || "-";
             };
             const fDate = (val) => val ? new Date(val).toLocaleString('id-ID') : '-';
+
+            // Mapping Jenis Fasyankes
+            document.getElementById('pr_jenis_fasyankes').innerText = v('in-jenis').toUpperCase();
 
             // Mapping Data Pasien
             document.getElementById('pr_kelompok_umur').innerText = v('kelompok_umur');
